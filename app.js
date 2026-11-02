@@ -1,88 +1,74 @@
-// Aesthetic Preview — simulate filler treatments with a fal.ai image-edit model.
-// Plain JS, no build step, no libraries.
+// Aesthetic Preview — treatment visualization with a fal.ai image-edit model.
+// Plain JS, no build step. Catalog lives in data.js.
 
-/* ---------- Treatments ---------- */
-// unit "mL" = filler volume. unit "level" = non-volume effect (0 = off).
-const TREATMENTS = [
-  { id: 'lips', name: 'Lips', unit: 'mL', max: 3, step: 0.5,
-    desc: 'Volume and definition',
-    prompt: (w, v) => `Lips: ${w} increase in lip volume, as from ${v} mL of hyaluronic acid filler. Keep a natural shape and proportions, softly defined lip border, no lipstick, no change to lip color.` },
-  { id: 'cheeks', name: 'Cheeks', unit: 'mL', max: 4, step: 0.5,
-    desc: 'Midface lift and cheekbone projection',
-    prompt: (w, v) => `Cheeks: ${w} midface volume and cheekbone projection, as from ${v} mL of filler in total. Slight lift of the midface, smooth natural contour.` },
-  { id: 'chin', name: 'Chin', unit: 'mL', max: 3, step: 0.5,
-    desc: 'Projection and profile balance',
-    prompt: (w, v) => `Chin: ${w} chin projection and definition, as from ${v} mL of filler. Better balance with the nose and lips, natural shape.` },
-  { id: 'jawline', name: 'Jawline', unit: 'mL', max: 6, step: 1,
-    desc: 'Sharper jaw contour',
-    prompt: (w, v) => `Jawline: ${w} jawline definition, as from ${v} mL of filler. Cleaner, more defined jaw contour from the angle of the jaw to the chin.` },
-  { id: 'nasolabial', name: 'Nasolabial folds', unit: 'mL', max: 2, step: 0.5,
-    desc: 'Soften smile lines nose → mouth',
-    prompt: (w, v) => `Nasolabial folds: ${w} softening of the lines from the nose to the corners of the mouth, as from ${v} mL of filler. Keep natural skin texture.` },
-  { id: 'marionette', name: 'Marionette lines', unit: 'mL', max: 2, step: 0.5,
-    desc: 'Soften lines below mouth corners',
-    prompt: (w, v) => `Marionette lines: ${w} softening of the lines running down from the corners of the mouth, as from ${v} mL of filler. Slightly lifted mouth corners.` },
-  { id: 'tearTrough', name: 'Under-eye (tear trough)', unit: 'mL', max: 2, step: 0.5,
-    desc: 'Fill hollows under the eyes',
-    prompt: (w, v) => `Under-eye tear troughs: ${w} filling of the hollows under the eyes, as from ${v} mL of filler. Smoother transition from lower eyelid to cheek.` },
-  { id: 'doubleChin', name: 'Double chin reduction', unit: 'level', max: 3, step: 1,
-    labels: ['Off', 'Light', 'Moderate', 'Strong'],
-    desc: 'Reduce fat under the chin',
-    prompt: (w) => `Under the chin: ${w} reduction of submental fat (double chin). Cleaner angle between neck and jaw.` },
-  { id: 'eyeBright', name: 'Eye brightening', unit: 'level', max: 3, step: 1,
-    labels: ['Off', 'Light', 'Moderate', 'Strong'],
-    desc: 'Reduce dark circles, rested look',
-    prompt: (w) => `Eyes: ${w} brightening — reduce dark circles and under-eye shadows for a more rested look. Keep iris color, eye shape and eyelashes unchanged.` },
-];
+const $ = id => document.getElementById(id);
+const byId = Object.fromEntries(TREATMENTS.map(t => [t.id, t]));
+const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
 const state = {
-  values: Object.fromEntries(TREATMENTS.map(t => [t.id, 0])),
-  photo: null,      // data URL of the original (resized)
-  result: null,     // URL of the generated image
+  plan: new Map(),        // treatment id → dose (number) or level (1–3)
+  cat: 'filler',
+  area: 'All',
+  style: 'balanced',
+  photo: null,            // resized data URL
+  versions: [],           // { url, plan: [[id,val]], style, prompt, time }
+  current: -1,
+  view: 'compare',
   promptEdited: false,
   stream: null,
 };
-
-/* ---------- Helpers ---------- */
-const $ = id => document.getElementById(id);
-
-function intensityWord(value, max) {
-  const f = value / max;
-  if (f <= 0.34) return 'subtle';
-  if (f <= 0.67) return 'moderate';
-  return 'pronounced but still natural-looking';
-}
-
-function displayValue(t, v) {
-  if (t.unit === 'level') return t.labels[v];
-  return v === 0 ? '—' : `${v} mL`;
-}
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
 };
 
-function showError(msg) {
-  const el = $('error');
-  el.textContent = msg || '';
-  el.hidden = !msg;
+/* ================= Formatting ================= */
+function fmtNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
+
+function doseText(t, v) {
+  if (t.type === 'level') return LEVELS[v];
+  return `${fmtNum(v)} ${catById[t.cat].unit}`;
 }
 
-/* ---------- Prompt ---------- */
-function buildPrompt() {
-  const lines = TREATMENTS
-    .filter(t => state.values[t.id] > 0)
-    .map(t => '- ' + t.prompt(intensityWord(state.values[t.id], t.max), state.values[t.id]));
+function rangeText(t) {
+  if (t.type === 'level') return 'Light · Medium · Intensive';
+  const u = catById[t.cat].unit;
+  return `Typical ${fmtNum(t.min)}–${fmtNum(t.max)} ${u}`;
+}
 
-  if (!lines.length) return '';
+/* ================= Prompt ================= */
+function intensityWord(t, v) {
+  const base = t.type === 'level' ? v / 3 : v / t.max;
+  const f = base * STYLES.find(s => s.id === state.style).factor;
+  if (f <= 0.34) return 'subtle';
+  if (f <= 0.67) return 'moderate';
+  if (f <= 1.0) return 'clearly visible';
+  return 'strong, well-defined';
+}
+
+const STYLE_LINE = {
+  natural: 'Overall the result must be subtle and very natural — someone who knows the person would only notice they look fresher.',
+  balanced: 'Overall the result should be clearly visible but still natural and harmonious.',
+  enhanced: 'Overall the result should be noticeably enhanced and well-defined, while remaining anatomically realistic.',
+};
+
+function buildPrompt() {
+  if (!state.plan.size) return '';
+  const groups = CATEGORIES.map(c => {
+    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id);
+    if (!items.length) return null;
+    return [`${c.name}:`, ...items.map(([id, v]) => '- ' + byId[id].prompt(intensityWord(byId[id], v), fmtNum(v)))].join('\n');
+  }).filter(Boolean);
 
   return [
-    'Photorealistic aesthetic-treatment simulation of this exact same person.',
-    'Keep their identity, facial structure, skin tone, skin texture and pores, hair, expression, pose, lighting, background and camera framing exactly the same.',
-    'Apply ONLY these changes:',
-    ...lines,
-    'Do not add makeup, do not retouch or smooth the skin, do not change age, and make no other changes. The result must look like a real, unedited photograph.',
+    'Photorealistic aesthetic-treatment simulation of this exact same person, as a post-treatment clinical photo.',
+    'Keep identity, bone structure, skin tone, real skin texture and pores, hair, expression, pose, lighting, background and framing exactly the same.',
+    'Apply ONLY the following treatments:',
+    '',
+    ...groups.flatMap(g => [g, '']),
+    STYLE_LINE[state.style],
+    'Do not add makeup, filters or beauty retouching, do not change age or ethnicity, and make no other changes. Output must look like a real unedited photograph.',
   ].join('\n');
 }
 
@@ -93,72 +79,181 @@ function refreshPrompt(force = false) {
   }
 }
 
-/* ---------- Treatment UI ---------- */
-function renderTreatments() {
-  const wrap = $('treatments');
+/* ================= Category tabs & filters ================= */
+function renderTabs() {
+  const wrap = $('catTabs');
   wrap.innerHTML = '';
-  for (const t of TREATMENTS) {
-    const card = document.createElement('div');
-    card.className = 't-card';
-    card.innerHTML = `
-      <span class="t-name">${t.name}</span>
-      <span class="t-val" id="val-${t.id}"></span>
-      <span class="t-desc">${t.desc}${t.unit === 'mL' ? ` · up to ${t.max} mL` : ''}</span>
-      <input type="range" min="0" max="${t.max}" step="${t.step}" value="0" aria-label="${t.name}" />`;
-    const input = card.querySelector('input');
-    input.addEventListener('input', () => {
-      state.values[t.id] = Number(input.value);
-      updateCard(t, card);
-      updateSummary();
-      refreshPrompt();
-    });
-    t._card = card; t._input = input;
-    updateCard(t, card);
-    wrap.appendChild(card);
+  for (const c of CATEGORIES) {
+    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id).length;
+    const b = document.createElement('button');
+    b.className = 'cat-tab' + (c.id === state.cat ? ' on' : '');
+    b.setAttribute('role', 'tab');
+    b.innerHTML = `<span class="ic">${c.icon}</span><span class="nm">${c.short}</span>${count ? `<span class="ct">${count}</span>` : ''}`;
+    b.onclick = () => { state.cat = c.id; state.area = 'All'; renderBuilder(); };
+    wrap.appendChild(b);
+  }
+  $('catBlurb').textContent = catById[state.cat].name + ' — ' + catById[state.cat].blurb;
+}
+
+function renderAreaFilter() {
+  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat).map(t => t.area))];
+  const wrap = $('areaFilter');
+  wrap.innerHTML = '';
+  if (areas.length <= 2) return;
+  for (const a of areas) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (a === state.area ? ' on' : '');
+    b.textContent = a;
+    b.onclick = () => { state.area = a; renderAreaFilter(); renderGrid(); };
+    wrap.appendChild(b);
   }
 }
 
-function updateCard(t, card) {
-  const v = state.values[t.id];
-  card.querySelector('.t-val').textContent = displayValue(t, v);
-  card.classList.toggle('active', v > 0);
+/* ================= Treatment cards ================= */
+function renderGrid() {
+  const grid = $('treatGrid');
+  grid.innerHTML = '';
+  const list = TREATMENTS.filter(t => t.cat === state.cat && (state.area === 'All' || t.area === state.area));
+  for (const t of list) grid.appendChild(card(t));
 }
 
-function updateSummary() {
-  const ml = TREATMENTS.filter(t => t.unit === 'mL').reduce((s, t) => s + state.values[t.id], 0);
-  const areas = TREATMENTS.filter(t => state.values[t.id] > 0).length;
-  $('totalMl').textContent = `${ml} mL`;
-  $('areaCount').textContent = areas;
-  updateApply();
+function card(t) {
+  const on = state.plan.has(t.id);
+  const el = document.createElement('div');
+  el.className = 't-card' + (on ? ' on' : '');
+  el.innerHTML = `
+    <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
+    <span class="t-desc">${t.desc}</span>
+    <span class="t-range">${rangeText(t)}</span>`;
+  el.onclick = () => toggle(t.id);
+
+  if (on) {
+    const v = state.plan.get(t.id);
+    const ctrl = document.createElement('div');
+    if (t.type === 'dose') {
+      ctrl.className = 'ctrl';
+      ctrl.innerHTML = `<button aria-label="Less">−</button><span class="val">${doseText(t, v)}</span><button aria-label="More">+</button>`;
+      const [minus, , plus] = ctrl.children;
+      minus.onclick = e => { e.stopPropagation(); setVal(t.id, Math.max(t.min, round(v - t.step))); };
+      plus.onclick = e => { e.stopPropagation(); setVal(t.id, Math.min(t.max, round(v + t.step))); };
+    } else {
+      ctrl.className = 'lvl';
+      for (let i = 1; i <= 3; i++) {
+        const b = document.createElement('button');
+        b.textContent = LEVELS[i];
+        if (i === v) b.className = 'on';
+        b.onclick = e => { e.stopPropagation(); setVal(t.id, i); };
+        ctrl.appendChild(b);
+      }
+    }
+    ctrl.addEventListener('click', e => e.stopPropagation());
+    el.appendChild(ctrl);
+  }
+  return el;
 }
 
-function updateApply() {
+const round = n => Math.round(n * 100) / 100;
+
+function toggle(id) {
+  if (state.plan.has(id)) state.plan.delete(id);
+  else state.plan.set(id, byId[id].def);
+  changed();
+}
+function setVal(id, v) { state.plan.set(id, v); changed(); }
+
+function renderBuilder() { renderTabs(); renderAreaFilter(); renderGrid(); }
+
+/* ================= Plan panel ================= */
+function renderPlan() {
+  const wrap = $('planList');
+  wrap.innerHTML = '';
+  for (const c of CATEGORIES) {
+    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id);
+    if (!items.length) continue;
+    const g = document.createElement('div');
+    g.className = 'plan-group';
+    g.innerHTML = `<h3>${c.icon} ${c.name}</h3>`;
+    for (const [id, v] of items) {
+      const t = byId[id];
+      const row = document.createElement('div');
+      row.className = 'plan-item';
+      row.innerHTML = `<span class="pi-name">${t.name} <span class="pi-area">· ${t.area}</span></span>
+        <span class="pi-dose">${doseText(t, v)}</span><button class="x" aria-label="Remove ${t.name}">×</button>`;
+      row.querySelector('.x').onclick = () => { state.plan.delete(id); changed(); };
+      g.appendChild(row);
+    }
+    wrap.appendChild(g);
+  }
+  $('planEmpty').hidden = state.plan.size > 0;
+
+  const sum = cat => [...state.plan].filter(([id]) => byId[id].cat === cat).reduce((s, [, v]) => s + v, 0);
+  $('totFiller').textContent = `${fmtNum(sum('filler'))} mL`;
+  $('totBotox').textContent = `${fmtNum(sum('botox'))} U`;
+  $('totCount').textContent = state.plan.size;
+}
+
+function renderStyles() {
+  const seg = $('styleSeg');
+  seg.innerHTML = '';
+  for (const s of STYLES) {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    if (s.id === state.style) b.className = 'on';
+    b.onclick = () => { state.style = s.id; renderStyles(); refreshPrompt(); };
+    seg.appendChild(b);
+  }
+  $('styleHint').textContent = STYLES.find(s => s.id === state.style).hint;
+}
+
+function changed() {
+  renderBuilder();
+  renderPlan();
+  refreshPrompt();
+  updateUI();
+}
+
+/* ================= Steps / apply state ================= */
+function updateUI() {
+  const step = !state.photo ? 1 : state.versions.length ? 3 : 2;
+  [1, 2, 3].forEach(i => {
+    const li = $('step' + i);
+    li.classList.toggle('active', i === step);
+    li.classList.toggle('done', i < step);
+  });
+
   const hasPrompt = $('promptText').value.trim().length > 0;
+  const key = store.get('fal_key');
   $('applyBtn').disabled = !(state.photo && hasPrompt);
+  $('applyHint').textContent =
+    !state.photo ? 'Add a client photo to start.' :
+    !hasPrompt ? 'Select at least one treatment.' :
+    !key ? 'Add your fal API key in ⚙ Settings.' : '';
+  $('applyBtn').textContent = state.versions.length ? '✨ Generate new version' : '✨ Generate preview';
 }
 
-/* ---------- Photo: upload / camera ---------- */
-function resizeToDataURL(source, w, h, maxSide = 1024) {
+function showError(msg) { $('error').textContent = msg || ''; $('error').hidden = !msg; }
+function setLoading(text) { $('loading').hidden = !text; if (text) $('loadingText').textContent = text; }
+
+/* ================= Photo: upload / camera ================= */
+function resizeToDataURL(source, w, h, maxSide = 1280) {
   const scale = Math.min(1, maxSide / Math.max(w, h));
   const c = $('canvas');
-  c.width = Math.round(w * scale);
-  c.height = Math.round(h * scale);
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
   c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.9);
+  return c.toDataURL('image/jpeg', 0.92);
 }
 
 function setPhoto(dataUrl) {
   state.photo = dataUrl;
-  state.result = null;
-  $('stage').classList.remove('empty');
+  state.versions = []; state.current = -1;
   $('placeholder').hidden = true;
   $('compare').hidden = true;
-  $('singleImg').src = dataUrl;
-  $('singleImg').hidden = false;
-  $('downloadBtn').hidden = true;
+  $('singleImg').src = dataUrl; $('singleImg').hidden = false;
+  ['downloadBtn', 'printBtn', 'viewToggle', 'historyWrap'].forEach(id => $(id).hidden = true);
   $('resetBtn').hidden = false;
   showError('');
-  updateApply();
+  renderHistory();
+  updateUI();
 }
 
 $('fileInput').addEventListener('change', e => {
@@ -166,10 +261,7 @@ $('fileInput').addEventListener('change', e => {
   if (!file) return;
   stopCamera();
   const img = new Image();
-  img.onload = () => {
-    setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight));
-    URL.revokeObjectURL(img.src);
-  };
+  img.onload = () => { setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight)); URL.revokeObjectURL(img.src); };
   img.onerror = () => showError('Could not read that image. Try a JPG or PNG.');
   img.src = URL.createObjectURL(file);
   e.target.value = '';
@@ -177,23 +269,14 @@ $('fileInput').addEventListener('change', e => {
 
 $('cameraBtn').addEventListener('click', async () => {
   showError('');
-  if (!navigator.mediaDevices?.getUserMedia) {
-    showError('Camera is not available in this browser. Use Upload instead.');
-    return;
-  }
+  if (!navigator.mediaDevices?.getUserMedia) { showError('Camera not available in this browser — use Upload.'); return; }
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1600 } },
-      audio: false,
+      video: { facingMode: 'user', width: { ideal: 1440 }, height: { ideal: 1800 } }, audio: false,
     });
-    const v = $('video');
-    v.srcObject = state.stream;
-    v.hidden = false;
-    $('placeholder').hidden = true;
-    $('singleImg').hidden = true;
-    $('compare').hidden = true;
-    $('snapBtn').hidden = false;
-    $('cancelCamBtn').hidden = false;
+    $('video').srcObject = state.stream;
+    ['video', 'camGuide', 'snapBtn', 'cancelCamBtn'].forEach(id => $(id).hidden = false);
+    ['placeholder', 'singleImg', 'compare'].forEach(id => $(id).hidden = true);
   } catch (err) {
     showError('Camera access was blocked or failed: ' + err.message);
   }
@@ -202,11 +285,10 @@ $('cameraBtn').addEventListener('click', async () => {
 $('snapBtn').addEventListener('click', () => {
   const v = $('video');
   if (!v.videoWidth) return;
-  // Draw mirrored so the photo matches what the user saw in the preview.
   const c = document.createElement('canvas');
   c.width = v.videoWidth; c.height = v.videoHeight;
   const ctx = c.getContext('2d');
-  ctx.translate(c.width, 0); ctx.scale(-1, 1);
+  ctx.translate(c.width, 0); ctx.scale(-1, 1);   // match mirrored preview
   ctx.drawImage(v, 0, 0);
   const data = resizeToDataURL(c, c.width, c.height);
   stopCamera();
@@ -215,48 +297,75 @@ $('snapBtn').addEventListener('click', () => {
 
 $('cancelCamBtn').addEventListener('click', () => {
   stopCamera();
-  if (state.photo) $('singleImg').hidden = false;
+  if (state.current >= 0) $('compare').hidden = false;
+  else if (state.photo) $('singleImg').hidden = false;
   else $('placeholder').hidden = false;
 });
 
 function stopCamera() {
   state.stream?.getTracks().forEach(t => t.stop());
   state.stream = null;
-  $('video').hidden = true;
-  $('snapBtn').hidden = true;
-  $('cancelCamBtn').hidden = true;
+  ['video', 'camGuide', 'snapBtn', 'cancelCamBtn'].forEach(id => $(id).hidden = true);
 }
 
 $('resetBtn').addEventListener('click', () => {
-  state.photo = null; state.result = null;
-  $('singleImg').hidden = true; $('compare').hidden = true;
-  $('placeholder').hidden = false; $('stage').classList.add('empty');
-  $('downloadBtn').hidden = true; $('resetBtn').hidden = true;
-  updateApply();
+  state.photo = null; state.versions = []; state.current = -1;
+  ['singleImg', 'compare', 'downloadBtn', 'printBtn', 'viewToggle', 'historyWrap', 'resetBtn'].forEach(id => $(id).hidden = true);
+  $('placeholder').hidden = false;
+  updateUI();
 });
 
-/* ---------- Before / after ---------- */
-function showCompare(before, after) {
-  $('beforeImg').src = before;
-  $('afterImg').src = after;
+/* ================= Result view ================= */
+function showVersion(i) {
+  state.current = i;
+  const v = state.versions[i];
+  $('beforeImg').src = state.photo;
+  $('afterImg').src = v.url;
   $('singleImg').hidden = true;
   $('compare').hidden = false;
-  setSplit(50);
-  $('compareRange').value = 50;
+  setView(state.view);
+  setSplit(50); $('compareRange').value = 50;
+  $('downloadBtn').href = v.url;
+  ['downloadBtn', 'printBtn', 'viewToggle'].forEach(id => $(id).hidden = false);
+  renderHistory();
 }
+
 function setSplit(p) {
   $('beforeImg').style.clipPath = `inset(0 ${100 - p}% 0 0)`;
   $('divider').style.left = p + '%';
 }
 $('compareRange').addEventListener('input', e => setSplit(Number(e.target.value)));
 
-/* ---------- fal.ai ---------- */
+function setView(view) {
+  state.view = view;
+  const c = $('compare');
+  c.classList.toggle('side', view === 'side');
+  c.classList.toggle('after', view === 'after');
+  if (view === 'compare') setSplit(Number($('compareRange').value));
+  $('viewToggle').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+}
+$('viewToggle').addEventListener('click', e => { const v = e.target.dataset?.view; if (v) setView(v); });
+
+function renderHistory() {
+  const strip = $('history');
+  strip.innerHTML = '';
+  $('historyWrap').hidden = state.versions.length < 1;
+  state.versions.forEach((v, i) => {
+    const b = document.createElement('button');
+    if (i === state.current) b.className = 'on';
+    b.title = v.plan.map(([id, val]) => `${byId[id].name} ${doseText(byId[id], val)}`).join(', ');
+    b.innerHTML = `<img src="${v.url}" alt="Version ${i + 1}" /><span>V${i + 1}</span>`;
+    b.onclick = () => showVersion(i);
+    strip.appendChild(b);
+  });
+}
+
+/* ================= fal.ai ================= */
 function getSettings() {
   const model = store.get('fal_model') || 'fal-ai/nano-banana-2/edit';
-  const custom = store.get('fal_custom_model') || '';
   return {
     key: store.get('fal_key') || '',
-    model: model === 'custom' ? custom.trim() : model,
+    model: model === 'custom' ? (store.get('fal_custom_model') || '').trim() : model,
   };
 }
 
@@ -266,6 +375,7 @@ async function readError(res) {
     const j = JSON.parse(text);
     text = j.detail ? (typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)) : (j.message || text);
   } catch { /* not JSON */ }
+  if (res.status === 401 || res.status === 403) text = 'Invalid or unauthorized API key. ' + text;
   return `fal error ${res.status}: ${text}`.slice(0, 600);
 }
 
@@ -274,28 +384,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function runFal({ key, model, prompt, image }) {
   const headers = { Authorization: `Key ${key}`, 'Content-Type': 'application/json' };
 
-  // 1. Submit to the queue
   const submit = await fetch(`https://queue.fal.run/${model}`, {
-    method: 'POST',
-    headers,
+    method: 'POST', headers,
     body: JSON.stringify({ prompt, image_urls: [image], num_images: 1 }),
   });
   if (!submit.ok) throw new Error(await readError(submit));
   const { status_url, response_url } = await submit.json();
 
-  // 2. Poll status (up to ~3 minutes)
   const started = Date.now();
+  let done = false;
   while (Date.now() - started < 180000) {
     await sleep(1500);
     const s = await fetch(status_url, { headers });
     if (!s.ok) throw new Error(await readError(s));
     const st = await s.json();
-    if (st.status === 'COMPLETED') break;
-    if (st.status === 'IN_QUEUE') setLoading(`In queue${st.queue_position != null ? ` (#${st.queue_position})` : ''}…`);
-    else setLoading('Generating…');
+    if (st.status === 'COMPLETED') { done = true; break; }
+    setLoading(st.status === 'IN_QUEUE'
+      ? `In queue${st.queue_position != null ? ` · position ${st.queue_position + 1}` : ''}…`
+      : 'Applying treatments…');
   }
+  if (!done) throw new Error('The model took too long (over 3 minutes). Please try again.');
 
-  // 3. Fetch result
   const r = await fetch(response_url, { headers });
   if (!r.ok) throw new Error(await readError(r));
   const out = await r.json();
@@ -304,16 +413,11 @@ async function runFal({ key, model, prompt, image }) {
   return url;
 }
 
-function setLoading(text) {
-  $('loading').hidden = !text;
-  if (text) $('loadingText').textContent = text;
-}
-
 $('applyBtn').addEventListener('click', async () => {
   showError('');
   const { key, model } = getSettings();
-  if (!key) { showError('Add your fal API key in Settings first.'); $('settings').showModal(); return; }
-  if (!model) { showError('Choose a model in Settings.'); return; }
+  if (!key) { showError('Add your fal API key in Settings first.'); openSettings(); return; }
+  if (!model) { showError('Choose a model in Settings.'); openSettings(); return; }
   const prompt = $('promptText').value.trim();
   if (!state.photo || !prompt) return;
 
@@ -321,51 +425,68 @@ $('applyBtn').addEventListener('click', async () => {
   setLoading('Sending to AI…');
   try {
     const url = await runFal({ key, model, prompt, image: state.photo });
-    state.result = url;
-    showCompare(state.photo, url);
-    const dl = $('downloadBtn');
-    dl.href = url; dl.hidden = false;
+    state.versions.push({ url, prompt, style: state.style, model, plan: [...state.plan], time: new Date() });
+    showVersion(state.versions.length - 1);
   } catch (err) {
-    const msg = err.message === 'Failed to fetch'
-      ? 'Network error reaching fal. Check your connection, key and that the model ID is correct.'
-      : err.message;
-    showError(msg);
+    showError(err.message === 'Failed to fetch'
+      ? 'Network error reaching fal. Check your connection, API key and model ID.'
+      : err.message);
   } finally {
     setLoading('');
-    updateApply();
+    updateUI();
   }
 });
 
-/* ---------- Prompt box / clear ---------- */
-$('promptText').addEventListener('input', () => { state.promptEdited = true; updateApply(); });
-$('resetPromptBtn').addEventListener('click', () => { refreshPrompt(true); updateApply(); });
-$('clearBtn').addEventListener('click', () => {
-  for (const t of TREATMENTS) {
-    state.values[t.id] = 0; t._input.value = 0; updateCard(t, t._card);
-  }
-  refreshPrompt(true);
-  updateSummary();
+/* ================= Report ================= */
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+$('printBtn').addEventListener('click', () => {
+  const v = state.versions[state.current];
+  if (!v) return;
+  const clinic = store.get('clinic_name') || '';
+  const client = $('clientName').value.trim();
+  const style = STYLES.find(s => s.id === v.style).name;
+  $('rMeta').textContent = [clinic, client && `Client: ${client}`, v.time.toLocaleDateString(), `Style: ${style}`]
+    .filter(Boolean).join(' · ');
+  $('rBefore').src = state.photo;
+  $('rAfter').src = v.url;
+  $('rTable').innerHTML = '<tr><th>Category</th><th>Treatment</th><th>Area</th><th>Dose / intensity</th></tr>' +
+    v.plan.map(([id, val]) => {
+      const t = byId[id];
+      return `<tr><td>${esc(catById[t.cat].name)}</td><td>${esc(t.name)}</td><td>${esc(t.area)}</td><td>${esc(doseText(t, val))}</td></tr>`;
+    }).join('');
+  // wait for the result image to load before printing
+  const img = $('rAfter');
+  if (img.complete) window.print(); else img.onload = () => { img.onload = null; window.print(); };
 });
 
-/* ---------- Settings ---------- */
-function syncCustomField() {
-  $('customWrap').hidden = $('modelSelect').value !== 'custom';
-}
-$('settingsBtn').addEventListener('click', () => {
+/* ================= Prompt box / clear ================= */
+$('promptText').addEventListener('input', () => { state.promptEdited = true; updateUI(); });
+$('resetPromptBtn').addEventListener('click', () => { refreshPrompt(true); updateUI(); });
+$('clearBtn').addEventListener('click', () => { state.plan.clear(); state.promptEdited = false; changed(); });
+
+/* ================= Settings ================= */
+function openSettings() {
   $('keyInput').value = store.get('fal_key') || '';
   $('modelSelect').value = store.get('fal_model') || 'fal-ai/nano-banana-2/edit';
   $('customModel').value = store.get('fal_custom_model') || '';
-  syncCustomField();
+  $('clinicInput').value = store.get('clinic_name') || '';
+  $('customWrap').hidden = $('modelSelect').value !== 'custom';
   $('settings').showModal();
-});
-$('modelSelect').addEventListener('change', syncCustomField);
+}
+$('settingsBtn').addEventListener('click', openSettings);
+$('modelSelect').addEventListener('change', () => { $('customWrap').hidden = $('modelSelect').value !== 'custom'; });
 $('saveSettings').addEventListener('click', () => {
   store.set('fal_key', $('keyInput').value.trim());
   store.set('fal_model', $('modelSelect').value);
   store.set('fal_custom_model', $('customModel').value.trim());
+  store.set('clinic_name', $('clinicInput').value.trim());
+  setTimeout(updateUI, 0);
 });
 
-/* ---------- Init ---------- */
-renderTreatments();
-updateSummary();
+/* ================= Init ================= */
+renderStyles();
+renderBuilder();
+renderPlan();
 refreshPrompt(true);
+updateUI();
