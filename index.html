@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aesthetic Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo">◐</span>
+      <div>
+        <h1>Aesthetic Preview</h1>
+        <p class="tagline">Simulate filler treatments on a photo</p>
+      </div>
+    </div>
+    <button id="settingsBtn" class="ghost">⚙ Settings</button>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: photo -->
+    <section class="panel photo-panel">
+      <div class="panel-head">
+        <h2>1 · Photo</h2>
+        <div class="row">
+          <button id="cameraBtn" class="ghost">📷 Camera</button>
+          <label class="ghost file-btn">⬆ Upload
+            <input id="fileInput" type="file" accept="image/*" hidden />
+          </label>
+        </div>
+      </div>
+
+      <div id="stage" class="stage empty">
+        <div id="placeholder" class="placeholder">
+          <p>Take a photo or upload one.</p>
+          <p class="hint">Front-facing, good light, neutral expression works best.</p>
+        </div>
+
+        <video id="video" playsinline autoplay muted hidden></video>
+
+        <div id="compare" class="compare" hidden>
+          <img id="afterImg" alt="After" />
+          <img id="beforeImg" alt="Before" />
+          <div id="divider" class="divider"><span>⇔</span></div>
+          <input id="compareRange" type="range" min="0" max="100" value="50" aria-label="Before/after" />
+          <span class="tag tag-l">Before</span>
+          <span class="tag tag-r">After</span>
+        </div>
+
+        <img id="singleImg" class="single" alt="Your photo" hidden />
+
+        <div id="loading" class="loading" hidden>
+          <div class="spinner"></div>
+          <p id="loadingText">Generating…</p>
+        </div>
+      </div>
+
+      <div class="row stage-actions">
+        <button id="snapBtn" class="primary" hidden>Capture</button>
+        <button id="cancelCamBtn" class="ghost" hidden>Cancel</button>
+        <a id="downloadBtn" class="ghost" download="aesthetic-preview.jpg" hidden>⬇ Download result</a>
+        <button id="resetBtn" class="ghost" hidden>New photo</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: treatments -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>2 · Treatments</h2>
+        <button id="clearBtn" class="link">Clear all</button>
+      </div>
+
+      <div id="treatments" class="treatments"></div>
+
+      <div class="summary">
+        <div><span class="muted">Total filler</span> <strong id="totalMl">0 mL</strong></div>
+        <div><span class="muted">Areas</span> <strong id="areaCount">0</strong></div>
+      </div>
+
+      <details class="prompt-box">
+        <summary>Show / edit AI prompt</summary>
+        <textarea id="promptText" rows="9" spellcheck="false"></textarea>
+        <button id="resetPromptBtn" class="link">Rebuild from sliders</button>
+      </details>
+
+      <button id="applyBtn" class="primary big" disabled>✨ Apply treatments</button>
+      <p id="error" class="error" hidden></p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    AI simulation for visualization only — not a medical result or a guarantee of outcome. Consult a qualified practitioner.
+  </footer>
+
+  <!-- Settings dialog -->
+  <dialog id="settings">
+    <form method="dialog" class="settings-form">
+      <h2>Settings</h2>
+      <label>fal API key
+        <input id="keyInput" type="password" placeholder="xxxxxxxx-xxxx-…:…" autocomplete="off" />
+      </label>
+      <p class="hint">Stored only in this browser. Get one at fal.ai → Dashboard → Keys. Don't use this on a shared device.</p>
+
+      <label>Model
+        <select id="modelSelect">
+          <option value="fal-ai/nano-banana-2/edit">Nano Banana 2 (edit) — recommended</option>
+          <option value="fal-ai/nano-banana-pro/edit">Nano Banana Pro (edit)</option>
+          <option value="fal-ai/bytedance/seedream/v5/lite/edit">Seedream 5.0 Lite (edit)</option>
+          <option value="fal-ai/flux-2-pro/edit">FLUX.2 [pro] (edit)</option>
+          <option value="custom">Custom endpoint…</option>
+        </select>
+      </label>
+      <label id="customWrap" hidden>Custom endpoint ID
+        <input id="customModel" placeholder="owner/model/edit" />
+      </label>
+
+      <div class="row end">
+        <button value="cancel" class="ghost">Close</button>
+        <button id="saveSettings" value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <canvas id="canvas" hidden></canvas>
+  <script src="app.js"></script>
+</body>
+</html>

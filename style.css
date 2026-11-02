@@ -1,0 +1,155 @@
+:root {
+  --bg: #f7f2ee;
+  --panel: #fffdfb;
+  --ink: #2b2220;
+  --muted: #8a7b75;
+  --line: #eadfd8;
+  --accent: #b8697a;
+  --accent-ink: #ffffff;
+  --accent-soft: #f4e3e6;
+  --error: #b3261e;
+  --radius: 16px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1716;
+    --panel: #24201e;
+    --ink: #f3ebe7;
+    --muted: #a8988f;
+    --line: #3a322f;
+    --accent: #d88b9b;
+    --accent-ink: #1b1716;
+    --accent-soft: #3a2a2d;
+    --error: #ff8a80;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 Inter, system-ui, sans-serif;
+  min-height: 100vh;
+}
+h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; margin: 0; }
+h1 { font-size: 1.35rem; }
+h2 { font-size: 1.1rem; }
+button, select, input, textarea { font: inherit; color: inherit; }
+
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; max-width: 1200px; margin: 0 auto;
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo { font-size: 1.8rem; color: var(--accent); }
+.tagline { margin: 0; color: var(--muted); font-size: .9rem; }
+
+.layout {
+  max-width: 1200px; margin: 0 auto; padding: 0 24px 24px;
+  display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; padding: 0 16px 16px; }
+  .top { padding: 16px; }
+}
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row.end { justify-content: flex-end; }
+
+/* Buttons */
+.primary, .ghost, .link { white-space: nowrap; cursor: pointer; border-radius: 999px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.primary { background: var(--accent); color: var(--accent-ink); border: 0; padding: 9px 18px; font-weight: 600; }
+.primary:disabled { opacity: .45; cursor: not-allowed; }
+.primary.big { width: 100%; justify-content: center; padding: 14px; font-size: 1rem; }
+.ghost { background: transparent; border: 1px solid var(--line); padding: 8px 14px; }
+.ghost:hover { border-color: var(--accent); }
+.link { background: none; border: 0; color: var(--accent); padding: 0; font-weight: 500; }
+
+/* Stage */
+.stage {
+  position: relative; width: 100%; aspect-ratio: 4 / 5;
+  border-radius: 12px; overflow: hidden; background: var(--accent-soft);
+  display: grid; place-items: center;
+}
+.placeholder { text-align: center; padding: 20px; }
+.placeholder p { margin: 4px 0; }
+.hint { color: var(--muted); font-size: .85rem; margin: 0; }
+.stage video, .stage .single, .compare img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000;
+}
+.stage video { transform: scaleX(-1); }
+
+.compare { position: absolute; inset: 0; }
+.compare #beforeImg { clip-path: inset(0 50% 0 0); }
+.compare input[type=range] {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0;
+}
+.divider {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #fff;
+  transform: translateX(-1px); pointer-events: none;
+}
+.divider span {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: #fff; color: #333; border-radius: 999px; padding: 4px 8px; font-size: .8rem;
+}
+.tag {
+  position: absolute; top: 10px; background: rgba(0,0,0,.55); color: #fff;
+  font-size: .75rem; padding: 3px 9px; border-radius: 999px; pointer-events: none;
+}
+.tag-l { left: 10px; } .tag-r { right: 10px; }
+
+.loading {
+  position: absolute; inset: 0; background: rgba(20,14,12,.55); color: #fff;
+  display: grid; place-content: center; justify-items: center; gap: 10px;
+}
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Treatments */
+.treatments { display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow: auto; padding-right: 4px; }
+.t-card {
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+}
+.t-card.active { border-color: var(--accent); background: var(--accent-soft); }
+.t-name { font-weight: 600; }
+.t-desc { grid-column: 1 / -1; color: var(--muted); font-size: .82rem; }
+.t-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+.t-card input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+
+.summary { display: flex; justify-content: space-between; padding: 10px 2px; border-top: 1px solid var(--line); }
+.muted { color: var(--muted); }
+
+.prompt-box summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+.prompt-box textarea {
+  width: 100%; margin: 8px 0 4px; padding: 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); font: 12.5px/1.45 ui-monospace, Menlo, monospace; resize: vertical;
+}
+.error { color: var(--error); margin: 0; font-size: .9rem; white-space: pre-wrap; }
+
+.foot { text-align: center; color: var(--muted); font-size: .8rem; padding: 10px 16px 28px; }
+
+/* Dialog */
+dialog {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink);
+  width: min(460px, calc(100vw - 32px)); padding: 0;
+}
+dialog::backdrop { background: rgba(0,0,0,.4); }
+.settings-form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.settings-form label { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
+.settings-form input, .settings-form select {
+  padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+}
