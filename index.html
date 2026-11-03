@@ -62,12 +62,16 @@
           <span class="tag tag-r">After</span>
         </div>
 
+        <img id="areaImg" class="single" alt="Treated areas" hidden />
+
         <div id="loading" class="loading" hidden>
           <div class="spinner"></div>
           <p id="loadingText">Generating…</p>
           <p class="hint light">Usually 10–40 seconds</p>
         </div>
       </div>
+
+      <p id="faceStatus" class="face-status" hidden></p>
 
       <div class="row stage-actions">
         <button id="snapBtn" class="primary" hidden>Capture photo</button>
@@ -78,7 +82,7 @@
           <button data-view="after">After</button>
         </div>
         <span class="spacer"></span>
-        <a id="downloadBtn" class="ghost sm" download="aesthetic-preview.jpg" target="_blank" rel="noopener" hidden>⬇ Image</a>
+        <a id="downloadBtn" class="ghost sm" download="aesthetic-preview.jpg" hidden>⬇ Image</a>
         <button id="printBtn" class="ghost sm" hidden>🖨 Report</button>
         <button id="resetBtn" class="ghost sm" hidden>New photo</button>
       </div>
@@ -116,6 +120,15 @@
           <span>Result style</span>
           <div id="styleSeg" class="seg full"></div>
           <p id="styleHint" class="hint"></p>
+        </div>
+
+        <div class="protect">
+          <label class="switch">
+            <input id="protectToggle" type="checkbox" checked />
+            <span class="track"></span>
+            <span><strong>Change only selected areas</strong><br /><span class="hint">Everything else stays exactly as in the original photo</span></span>
+          </label>
+          <button id="areasBtn" class="ghost sm" disabled>👁 Show areas</button>
         </div>
 
         <div id="planList" class="plan-list"></div>
@@ -193,6 +206,7 @@
 
   <canvas id="canvas" hidden></canvas>
   <script src="data.js"></script>
+  <script src="face.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

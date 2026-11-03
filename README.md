@@ -18,6 +18,7 @@ Live: https://hklejda.github.io/test/
 - Compare slider, side-by-side or after-only view
 - Version history for comparing plans
 - Printable report (before/after and plan table) → save as PDF
+- **Change only selected areas (on by default):** the app maps the face (MediaPipe Face Landmarker, 478 points), builds a soft mask of just the selected treatment areas, aligns the AI result to the original, and pastes AI pixels **only inside that mask**. Everything else (eyes, skin, hair, background) is the original photo, pixel for pixel. **👁 Show areas** previews exactly what can change.
 
 Plain HTML, CSS and JavaScript. No build step, no libraries.
 
@@ -29,6 +30,7 @@ Plain HTML, CSS and JavaScript. No build step, no libraries.
 ## Files
 
 - `data.js` – treatment catalog (categories, doses, prompt text)
+- `face.js` – face landmarks, treatment-area masks, alignment, colour match, protected compositing
 - `app.js` – UI, prompt builder, camera/upload, fal queue API, history, report
 - `style.css` – styles (light/dark, print)
 - `.github/workflows/pages.yml` – deploys to GitHub Pages on every push

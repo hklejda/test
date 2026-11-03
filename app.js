@@ -16,6 +16,10 @@ const state = {
   view: 'compare',
   promptEdited: false,
   stream: null,
+  photoImg: null,         // HTMLImageElement of the original
+  faceL: null,            // face landmarks of the original (pixel coords)
+  face: 'none',           // none | loading | ok | missing | error
+  showAreas: false,
 };
 
 const store = {
@@ -125,7 +129,12 @@ function card(t) {
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
     <span class="t-range">${rangeText(t)}</span>`;
-  el.onclick = () => toggle(t.id);
+  if (on) {
+    el.querySelector('.t-top').onclick = () => toggle(t.id);
+    el.querySelector('.t-check').title = 'Remove';
+  } else {
+    el.onclick = () => toggle(t.id);
+  }
 
   if (on) {
     const v = state.plan.get(t.id);
@@ -210,6 +219,7 @@ function changed() {
   renderPlan();
   refreshPrompt();
   updateUI();
+  if (state.showAreas) renderAreas();
 }
 
 /* ================= Steps / apply state ================= */
@@ -227,7 +237,10 @@ function updateUI() {
   $('applyHint').textContent =
     !state.photo ? 'Add a client photo to start.' :
     !hasPrompt ? 'Select at least one treatment.' :
-    !key ? 'Add your fal API key in ⚙ Settings.' : '';
+    !key ? 'Add your fal API key in ⚙ Settings.' :
+    protectOn() && state.face === 'loading' ? 'Mapping the face… one moment.' :
+    protectOn() && state.face !== 'ok' ? 'Face not mapped — turn off "Change only selected areas" or use a clearer front photo.' : '';
+  $('areasBtn').disabled = !(state.face === 'ok' && state.plan.size);
   $('applyBtn').textContent = state.versions.length ? '✨ Generate new version' : '✨ Generate preview';
 }
 
@@ -253,8 +266,70 @@ function setPhoto(dataUrl) {
   $('resetBtn').hidden = false;
   showError('');
   renderHistory();
+  setAreas(false);
+  updateUI();
+  mapFace(dataUrl);
+}
+
+/* ================= Face mapping ================= */
+const protectOn = () => $('protectToggle').checked;
+
+function loadImage(src, cors = false) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (cors) img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Image failed to load'));
+    img.src = src;
+  });
+}
+
+function setFaceStatus(kind, text) {
+  state.face = kind;
+  const el = $('faceStatus');
+  el.hidden = !text;
+  el.className = 'face-status' + (kind === 'ok' ? ' ok' : kind === 'missing' || kind === 'error' ? ' warn' : '');
+  el.textContent = text || '';
   updateUI();
 }
+
+async function mapFace(dataUrl) {
+  state.faceL = null;
+  setFaceStatus('loading', '⏳ Mapping face…');
+  try {
+    const img = await loadImage(dataUrl);
+    if (state.photo !== dataUrl) return;            // photo changed meanwhile
+    state.photoImg = img;
+    const L = await Face.detect(img);
+    if (state.photo !== dataUrl) return;
+    if (!L) { setFaceStatus('missing', '⚠ No face found. Use a clear, front-facing photo.'); return; }
+    state.faceL = L;
+    setFaceStatus('ok', '✓ Face mapped — only the selected areas will change');
+    if (state.showAreas) renderAreas();
+  } catch (err) {
+    console.error(err);
+    setFaceStatus('error', '⚠ Face mapping could not load (check internet). You can turn protection off to continue.');
+  }
+}
+
+/* ---------- Area preview ---------- */
+function renderAreas() {
+  const ids = [...state.plan.keys()];
+  if (!state.faceL || !ids.length) { setAreas(false); return; }
+  const { naturalWidth: w, naturalHeight: h } = state.photoImg;
+  const mask = Face.buildMask(ids, [state.faceL], w, h);
+  $('areaImg').src = Face.tint(state.photoImg, mask).toDataURL('image/jpeg', 0.85);
+  $('areaImg').hidden = false;
+}
+
+function setAreas(on) {
+  state.showAreas = on;
+  $('areasBtn').classList.toggle('on', on);
+  $('areasBtn').textContent = on ? '👁 Hide areas' : '👁 Show areas';
+  if (on) renderAreas(); else $('areaImg').hidden = true;
+}
+$('areasBtn').addEventListener('click', () => setAreas(!state.showAreas));
+$('protectToggle').addEventListener('change', updateUI);
 
 $('fileInput').addEventListener('change', e => {
   const file = e.target.files?.[0];
@@ -276,7 +351,7 @@ $('cameraBtn').addEventListener('click', async () => {
     });
     $('video').srcObject = state.stream;
     ['video', 'camGuide', 'snapBtn', 'cancelCamBtn'].forEach(id => $(id).hidden = false);
-    ['placeholder', 'singleImg', 'compare'].forEach(id => $(id).hidden = true);
+    ['placeholder', 'singleImg', 'compare', 'areaImg'].forEach(id => $(id).hidden = true);
   } catch (err) {
     showError('Camera access was blocked or failed: ' + err.message);
   }
@@ -309,7 +384,9 @@ function stopCamera() {
 }
 
 $('resetBtn').addEventListener('click', () => {
-  state.photo = null; state.versions = []; state.current = -1;
+  state.photo = null; state.versions = []; state.current = -1; state.faceL = null; state.photoImg = null;
+  setAreas(false);
+  setFaceStatus('none', '');
   ['singleImg', 'compare', 'downloadBtn', 'printBtn', 'viewToggle', 'historyWrap', 'resetBtn'].forEach(id => $(id).hidden = true);
   $('placeholder').hidden = false;
   updateUI();
@@ -327,6 +404,7 @@ function showVersion(i) {
   setSplit(50); $('compareRange').value = 50;
   $('downloadBtn').href = v.url;
   ['downloadBtn', 'printBtn', 'viewToggle'].forEach(id => $(id).hidden = false);
+  setAreas(false);
   renderHistory();
 }
 
@@ -413,6 +491,20 @@ async function runFal({ key, model, prompt, image }) {
   return url;
 }
 
+// Load the model's image so its pixels can be read (needs CORS).
+async function loadResult(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const obj = URL.createObjectURL(blob);
+    const img = await loadImage(obj);
+    return img;
+  } catch {
+    return loadImage(url, true);
+  }
+}
+
 $('applyBtn').addEventListener('click', async () => {
   showError('');
   const { key, model } = getSettings();
@@ -420,13 +512,29 @@ $('applyBtn').addEventListener('click', async () => {
   if (!model) { showError('Choose a model in Settings.'); openSettings(); return; }
   const prompt = $('promptText').value.trim();
   if (!state.photo || !prompt) return;
+  const protect = protectOn();
+  if (protect && state.face !== 'ok') {
+    showError(state.face === 'loading' ? 'Still mapping the face — try again in a moment.'
+      : 'The face could not be mapped, so protection can\'t be applied. Use a clearer front photo, or turn off "Change only selected areas".');
+    return;
+  }
 
   $('applyBtn').disabled = true;
   setLoading('Sending to AI…');
   try {
-    const url = await runFal({ key, model, prompt, image: state.photo });
-    state.versions.push({ url, prompt, style: state.style, model, plan: [...state.plan], time: new Date() });
+    const raw = await runFal({ key, model, prompt, image: state.photo });
+    let url = raw, note = '';
+    if (protect) {
+      setLoading('Keeping untreated areas original…');
+      const result = await loadResult(raw);
+      const out = await Face.protect({ original: state.photoImg, origL: state.faceL, result, ids: [...state.plan.keys()] });
+      url = out.canvas.toDataURL('image/jpeg', 0.93);
+      if (!out.aligned) note = 'Note: the face in the AI result was not detected, so alignment may be slightly off.';
+    }
+    state.versions.push({ url, raw, protect, prompt, style: state.style, model, plan: [...state.plan], time: new Date() });
     showVersion(state.versions.length - 1);
+    if (note) showError(note);
+    if (window.innerWidth < 960) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     showError(err.message === 'Failed to fetch'
       ? 'Network error reaching fal. Check your connection, API key and model ID.'
