@@ -55,12 +55,15 @@ function scaler(f) {
   return (n, cap = 95) => Math.max(10, Math.min(cap, Math.round((n * f) / 5) * 5));
 }
 
+const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && !Warp.isShape(id)));
+const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id));
+
 function buildPrompt() {
-  if (!state.plan.size) return '';
-  const items = CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id));
+  const items = aiItems();
+  if (!items.length) return '';
   const lines = items.map(([id, v], i) => `${i + 1}. ${byId[id].prompt(scaler(strength(byId[id], v)))}`);
   const hasSkin = items.some(([id]) => byId[id].cat === 'skin');
-  const hasShape = items.some(([id]) => byId[id].cat !== 'skin');
+  const hasShape = items.some(([id]) => byId[id].cat !== 'skin');   // botox lines etc.
 
   return [
     `Using the provided photo of this person, make ONLY the following ${lines.length > 1 ? lines.length + ' changes' : 'change'}. ` +
@@ -68,7 +71,7 @@ function buildPrompt() {
     '',
     ...lines,
     '',
-    ...(hasShape ? ['Shape and volume changes must be real changes of the 3D form and outline of the face — NOT makeup, highlighter, contour, blush or lighting effects. Keep the skin color, brightness and lighting the same as in the original photo.', ''] : []),
+    ...(hasShape ? ['Do not add makeup, highlighter, contour, blush or lighting effects. Keep the skin color, brightness and lighting the same as in the original photo.', ''] : []),
     'Keep everything else exactly the same: the same person and identity, eyes, eye color, nose, mouth, hair, expression, ' +
       'head position, camera angle, framing, lighting, colors, background and clothing — except where a change above requires it.',
     hasSkin
@@ -82,6 +85,9 @@ function refreshPrompt(force = false) {
     $('promptText').value = buildPrompt();
     state.promptEdited = false;
   }
+  $('promptText').placeholder = shapeItems().length
+    ? 'No AI needed: the selected treatments are shape changes, done by precise face reshaping (instant, free).'
+    : '';
 }
 
 /* ================= Category tabs & filters ================= */
@@ -129,7 +135,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)}</span>`;
+    <span class="t-range">${rangeText(t)} · ${Warp.isShape(t.id) ? 'precise reshape' : 'AI'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';
@@ -232,15 +238,17 @@ function updateUI() {
     li.classList.toggle('done', i < step);
   });
 
+  const needAI = aiItems().length > 0, needFace = shapeItems().length > 0 || (needAI && protectOn());
   const hasPrompt = $('promptText').value.trim().length > 0;
   const key = store.get('fal_key');
-  $('applyBtn').disabled = !(state.photo && hasPrompt);
+  $('applyBtn').disabled = !(state.photo && state.plan.size && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
   $('applyHint').textContent =
     !state.photo ? 'Add a client photo to start.' :
-    !hasPrompt ? 'Select at least one treatment.' :
-    !key ? 'Add your fal API key in ⚙ Settings.' :
-    protectOn() && state.face === 'loading' ? 'Mapping the face… one moment.' :
-    protectOn() && state.face !== 'ok' ? 'Face not mapped — turn off "Change only selected areas" or use a clearer front photo.' : '';
+    !state.plan.size ? 'Select at least one treatment.' :
+    needFace && state.face === 'loading' ? 'Mapping the face… one moment.' :
+    needFace && state.face !== 'ok' ? 'Face not mapped — use a clear, front-facing photo.' :
+    needAI && !key ? 'Add your fal API key in ⚙ Settings (needed for skin & line treatments).' :
+    !needAI ? 'Shape treatments only — no AI needed, instant and free.' : '';
   $('areasBtn').disabled = !(state.face === 'ok' && state.plan.size);
   $('applyBtn').textContent = state.versions.length ? '✨ Generate new version' : '✨ Generate preview';
 }
@@ -399,7 +407,7 @@ function showVersion(i) {
   const v = state.versions[i];
   $('beforeImg').src = state.photo;
   $('afterImg').src = v.url;
-  $('rawViewBtn').hidden = !v.protect;
+  $('rawViewBtn').hidden = !(v.protect && v.raw);
   $('singleImg').hidden = true;
   $('compare').hidden = false;
   setView(state.view);
@@ -513,31 +521,50 @@ async function loadResult(url) {
 
 $('applyBtn').addEventListener('click', async () => {
   showError('');
-  const { key, model } = getSettings();
-  if (!key) { showError('Add your fal API key in Settings first.'); openSettings(); return; }
-  if (!model) { showError('Choose a model in Settings.'); openSettings(); return; }
-  const prompt = $('promptText').value.trim();
-  if (!state.photo || !prompt) return;
+  const ai = aiItems(), shape = shapeItems();
+  if (!state.photo || !state.plan.size) return;
   const protect = protectOn();
-  if (protect && state.face !== 'ok') {
+  const { key, model } = getSettings();
+  const prompt = $('promptText').value.trim();
+
+  if (ai.length && !key) { showError('Add your fal API key in Settings first (needed for skin & line treatments).'); openSettings(); return; }
+  if (ai.length && !model) { showError('Choose a model in Settings.'); openSettings(); return; }
+  if ((shape.length || (ai.length && protect)) && state.face !== 'ok') {
     showError(state.face === 'loading' ? 'Still mapping the face — try again in a moment.'
-      : 'The face could not be mapped, so protection can\'t be applied. Use a clearer front photo, or turn off "Change only selected areas".');
+      : 'The face could not be mapped. Use a clear, front-facing photo with good light.');
     return;
   }
 
   $('applyBtn').disabled = true;
-  setLoading('Sending to AI…');
   try {
-    const raw = await runFal({ key, model, prompt, image: state.photo });
-    let url = raw, note = '';
-    if (protect) {
-      setLoading('Keeping untreated areas original…');
+    let base = state.photoImg, raw = null, note = '';
+
+    // 1) Skin & line treatments → AI (only inside their areas when protection is on)
+    if (ai.length) {
+      setLoading('Sending to AI…');
+      raw = await runFal({ key, model, prompt, image: state.photo });
       const result = await loadResult(raw);
-      const out = await Face.protect({ original: state.photoImg, origL: state.faceL, result, ids: [...state.plan.keys()] });
-      url = out.canvas.toDataURL('image/jpeg', 0.93);
-      if (!out.aligned) note = 'Note: the face in the AI result was not detected, so alignment may be slightly off.';
+      if (protect) {
+        setLoading('Keeping untreated areas original…');
+        const out = await Face.protect({ original: state.photoImg, origL: state.faceL, result, ids: ai.map(([id]) => id) });
+        base = out.canvas;
+        if (!out.aligned) note = 'Note: the face in the AI result was not detected, so alignment may be slightly off.';
+      } else {
+        base = result;
+      }
     }
-    state.versions.push({ url, raw, protect, prompt, style: state.style, model, plan: [...state.plan], time: new Date() });
+
+    // 2) Shape treatments → precise reshaping on the face landmarks
+    if (shape.length) {
+      setLoading('Reshaping…');
+      await new Promise(r => setTimeout(r, 30));      // let the spinner paint
+      const L = (!ai.length || protect) ? state.faceL : (await Face.detect(base)) || state.faceL;
+      base = Warp.apply(base, L, shape.map(([id, v]) => [id, strength(byId[id], v)]));
+    }
+
+    const url = (base instanceof HTMLCanvasElement ? base : toCanvas(base)).toDataURL('image/jpeg', 0.93);
+    state.versions.push({ url, raw, protect: !!raw && protect, prompt: ai.length ? prompt : '', style: state.style,
+      model: ai.length ? model : 'reshape', plan: [...state.plan], time: new Date() });
     showVersion(state.versions.length - 1);
     if (note) showError(note);
     if (window.innerWidth < 960) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -550,6 +577,13 @@ $('applyBtn').addEventListener('click', async () => {
     updateUI();
   }
 });
+
+function toCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
 
 /* ================= Report ================= */
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
