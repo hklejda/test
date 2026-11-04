@@ -115,7 +115,12 @@
       case 'nose':       return { add: [l(pts([168, 6, 197, 195, 5, 4]), 0.12), e(P(1), 0.1, 0.075)] };
 
       // Botox
-      case 'forehead':   return { add: [e(off(P(151), 0, -0.01), 0.33, 0.13)] };
+      case 'forehead': {
+        // Whole forehead: from just above the brows up past the top landmarks (hairline).
+        const bottom = [...R_BROW_TOP, ...L_BROW_TOP.slice().reverse()].map(i => off(P(i), 0, -0.02));
+        const top = [284, 332, 297, 338, 10, 109, 67, 103, 54].map(i => off(P(i), 0, -0.08));
+        return { add: [p([...bottom, ...top], 0.02)] };
+      }
       case 'glabella':   return { add: [e(P(9), 0.08, 0.08)] };
       case 'crowsFeet':  return { add: [e(off(P(33), -0.07, 0), 0.07, 0.08), e(off(P(263), 0.07, 0), 0.07, 0.08)] };
       case 'browLift':   return { add: [
