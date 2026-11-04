@@ -11,14 +11,14 @@ Live: https://hklejda.github.io/test/
   - **Dermal fillers (mL):** lips, cheeks, chin, jawline, nasolabial, marionette, tear troughs, temples
   - **Botox (units):** forehead, glabella, crow's feet, brow lift, bunny lines, lip flip, gummy smile, masseter, chin dimpling, neck (Nefertiti)
   - **Skin:** skin booster, laser resurfacing, pigmentation, acne scars, eye brightening, HIFU/RF tightening
-  - **Contouring:** double chin, lower-cheek slimming, jowls, thread lift
+  - **Contouring:** double chin, lower-cheek slimming, jawline definition, thread lift
 - Filter by face area, adjust dose or intensity per treatment
 - **Result style:** Natural / Balanced / Enhanced
 - Treatment plan summary with total filler mL and botox units
 - Compare slider, side-by-side or after-only view
 - Version history for comparing plans
 - Printable report (before/after and plan table) → save as PDF
-- **Precise reshaping for shape treatments:** fillers (lips, cheeks, chin, jawline, temples), brow lift, lip flip, gummy smile, jaw slimming, double chin, lower cheeks, jowls, thread lift and tightening are done by landmark-driven warping (`warp.js`), not AI. Amount scales with the dose. Instant, free, no lighting artefacts.
+- **Precise reshaping for shape treatments:** fillers (lips, cheeks, chin, jawline, temples), brow lift, lip flip, gummy smile, jaw slimming, double chin, lower cheeks, jawline definition, thread lift and tightening are done by landmark-driven warping (`warp.js`), not AI. Amount scales with the dose. Instant, free, no lighting artefacts.
 - **AI for skin & line treatments:** acne, pigmentation, laser, booster, dark circles, wrinkles (botox lines), nasolabial/marionette lines, tear troughs.
 - **Change only selected areas (on by default):** the app maps the face (MediaPipe Face Landmarker, 478 points), builds a soft mask of just the selected treatment areas, aligns the AI result to the original, and pastes AI pixels **only inside that mask**. Everything else (eyes, skin, hair, background) is the original photo, pixel for pixel. **👁 Show areas** previews exactly what can change.
 

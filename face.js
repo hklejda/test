@@ -143,7 +143,7 @@
       // Contouring
       case 'doubleChin': return { add: [p([...pts([136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365]), ...below([136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365], 0.3)]), e(off(P(152), 0, 0.02), 0.16, 0.08)] };
       case 'buccal':     return { add: [e(mid(P(50), P(172)), 0.11, 0.11), e(mid(P(280), P(397)), 0.11, 0.11), l(pts([93, 132, 58, 172]), 0.08), l(pts([323, 361, 288, 397]), 0.08)] };
-      case 'jowls':      return { add: [...jowls, ...jawLine] };
+      case 'jowls':      return { add: [...jawLine, p([...pts(LOWER_JAW), ...below(LOWER_JAW, 0.12)])] };
       case 'threads':    return { add: [...cheeks, ...jowls, ...jawLine, ...naso] };
       default: return null;
     }

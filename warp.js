@@ -106,9 +106,15 @@
       case 'doubleChin':
         push(off(P(152), 0, 0.10), 0.22 * W, 0.13 * W, 0, -0.05);
         break;
-      case 'jowls':
-        sides((sx, p) => push(p.jowl, 0.09 * W, 0.09 * W, -0.012 * sx, -0.018));
+      case 'jowls': {
+        // Jawline definition: tighten the soft tissue just below the jaw edge up against it,
+        // from the jaw angle to beside the chin (the chin centre is handled by Double chin).
+        for (const i of [172, 136, 150, 176, 397, 365, 379, 400]) {
+          const sx = [172, 136, 150, 176].includes(i) ? -1 : 1;
+          push(off(P(i), 0, 0.045), 0.09 * W, 0.075 * W, -0.008 * sx, -0.028);
+        }
         break;
+      }
       case 'threads':
         sides((sx, p) => {
           push(p.cheek, 0.2 * W, 0.18 * W, 0.006 * sx, -0.02);
