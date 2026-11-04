@@ -42,9 +42,6 @@ const TREATMENTS = [
   { id: 'temples', cat: 'filler', name: 'Temples', area: 'Upper face', type: 'dose', min: 1, max: 4, step: 0.5, def: 2,
     desc: 'Restore temple hollowing',
     prompt: k => `TEMPLES — add volume to the temples (the sides of the forehead next to the eyes) so any hollowing is about ${k(70)}% filled and they look smooth and slightly rounded.` },
-  { id: 'nose', cat: 'filler', name: 'Non-surgical nose', area: 'Nose', type: 'dose', min: 0.25, max: 1, step: 0.25, def: 0.5,
-    desc: 'Straighten bridge, lift tip',
-    prompt: k => `NOSE — make the nose bridge straighter and smoother (hide any bump) and lift the nose tip slightly; about ${k(50, 70)}% correction. Do not make the nose wider or bigger.` },
 
   // ---------- Botulinum toxin ----------
   { id: 'forehead', cat: 'botox', name: 'Forehead lines', area: 'Upper face', type: 'dose', min: 6, max: 20, step: 2, def: 10,
