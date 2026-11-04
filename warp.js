@@ -56,8 +56,9 @@
     switch (id) {
       case 'lips':
         // Calibrated on real before/after: 1 mL ≈ +55% upper, +35% lower lip height (Balanced).
-        lipStretch(1.08, 0.68);
-        bulge(mouth, lipW * 0.6, lipH * 0.9, 0.05, 0);          // slight extra width/projection
+        lipStretch(1.35, 1.25);                                  // bigger; lower lip grows down in the middle
+        push(off(mouth, 0, 0.5 * Math.max(dist(P(14), P(17)), 0.02 * W) / W), lipW * 0.38, lipH * 0.75, 0, 0.012);  // extra central pout of the lower lip
+        bulge(mouth, lipW * 0.6, lipH * 0.9, 0.06, 0);          // slight extra width/projection
         break;
       case 'lipFlip':
         lipStretch(0.45, 0);
