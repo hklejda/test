@@ -47,18 +47,20 @@
     const mouth = mid(P(13), P(14));
     // Lip expansion: lips grow away from the line where they meet (stomion);
     // eu/el = relative growth of upper/lower lip height, tapered toward the corners.
-    const lipStretch = (eu, el) => out.push({
-      t: 'L', c: mouth, ang, halfW: lipW * 0.62,
+    // taper: higher = volume more concentrated in the centre of the lips.
+    const lipStretch = (eu, el, taper = 2) => out.push({
+      t: 'L', c: mouth, ang, halfW: lipW * 0.72, taper,
       hu: Math.max(dist(P(0), P(13)), 0.015 * W), hl: Math.max(dist(P(14), P(17)), 0.02 * W),
       eu: eu * f, el: el * f,
     });
 
     switch (id) {
       case 'lips':
-        // Calibrated on real before/after: 1 mL ≈ +55% upper, +35% lower lip height (Balanced).
-        lipStretch(1.35, 1.25);                                  // bigger; lower lip grows down in the middle
-        push(off(mouth, 0, 0.5 * Math.max(dist(P(14), P(17)), 0.02 * W) / W), lipW * 0.38, lipH * 0.75, 0, 0.012);  // extra central pout of the lower lip
-        bulge(mouth, lipW * 0.6, lipH * 0.9, 0.06, 0);          // slight extra width/projection
+        // Natural result (like real before/after photos): same lip shape, rounded,
+        // fuller in the centre and softly less toward the corners; upper lip gains more.
+        // 1 mL (Balanced) ≈ +60% upper / +40% lower lip height at the centre.
+        lipStretch(1.15, 0.78, 2);
+        break;
         break;
       case 'lipFlip':
         lipStretch(0.45, 0);
@@ -159,7 +161,7 @@
           if (d.t === 'L') {
             const u = lx / d.halfW;
             if (u <= -1 || u >= 1) continue;
-            const wx = (1 - u * u) * (1 - u * u);
+            const wx = Math.pow(1 - u * u, d.taper || 2);
             const up = ly < 0, Y = Math.abs(ly), h = up ? d.hu : d.hl, e = (up ? d.eu : d.el) * wx;
             if (!e) continue;
             const Hn = h * (1 + e), B = h * 1.4;
