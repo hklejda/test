@@ -190,7 +190,7 @@
       }
     }
     // Feather the edges so the blend is invisible.
-    const sigma = Math.max(2, 0.018 * W);
+    const sigma = Math.max(3, 0.03 * W);
     const soft = canvas(w, h);
     const sctx = soft.getContext('2d');
     if (FILTER_OK) {
@@ -226,42 +226,77 @@
   }
   const applyM = (M, q) => ({ x: M.c * q.x - M.s * q.y + M.tx, y: M.s * q.x + M.c * q.y + M.ty });
 
-  /* ---------------- Colour match ---------------- */
-  // AI models often shift overall brightness/colour slightly. Match the AI image
-  // to the original using the face skin OUTSIDE the treated areas, so the pasted
-  // regions blend without a visible patch.
-  function colorMatch(origCtx, warpCtx, L, maskCanvas, w, h) {
-    const ref = canvas(w, h);
-    const rc = ref.getContext('2d');
-    rc.fillStyle = '#fff';
-    drawShape(rc, { t: 'p', pts: OVAL.map(i => L[i]), grow: 0 });
-    const R = rc.getImageData(0, 0, w, h).data;
-    const Mk = maskCanvas.getContext('2d').getImageData(0, 0, w, h).data;
-    const O = origCtx.getImageData(0, 0, w, h).data;
-    const wd = warpCtx.getImageData(0, 0, w, h);
-    const A = wd.data;
-
-    const so = [0, 0, 0], sa = [0, 0, 0], qo = [0, 0, 0], qa = [0, 0, 0];
-    let n = 0;
-    for (let i = 0; i < R.length; i += 16) {          // every 4th pixel is plenty
-      if (R[i + 3] < 200 || Mk[i + 3] > 10 || A[i + 3] < 250) continue;
+  /* ---------------- Seamless matching ---------------- */
+  // AI models often re-light the photo or shift brightness/colour. If we pasted
+  // their pixels directly, each treated area would show as a lighter or darker
+  // patch. Instead (gradient-domain idea, as in "seamless cloning"):
+  //   D = original − AI result, measured just OUTSIDE the treated areas,
+  //   smoothly interpolated INTO them (push-pull pyramid),
+  //   AI pixels + D  → matches the original exactly at every border, while the
+  //   real shape/texture change inside the area is kept.
+  function pushPull(vals, wts, w, h) {
+    if (w <= 2 && h <= 2) return;
+    const W2 = Math.ceil(w / 2), H2 = Math.ceil(h / 2);
+    const v2 = new Float32Array(W2 * H2 * 3), w2 = new Float32Array(W2 * H2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, j = (y >> 1) * W2 + (x >> 1), wt = wts[i];
+      if (!wt) continue;
+      w2[j] += wt;
+      v2[j * 3] += wt * vals[i * 3]; v2[j * 3 + 1] += wt * vals[i * 3 + 1]; v2[j * 3 + 2] += wt * vals[i * 3 + 2];
+    }
+    for (let j = 0; j < W2 * H2; j++) {
+      if (w2[j] > 0) { v2[j * 3] /= w2[j]; v2[j * 3 + 1] /= w2[j]; v2[j * 3 + 2] /= w2[j]; }
+      w2[j] = Math.min(1, w2[j]);
+    }
+    pushPull(v2, w2, W2, H2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, wt = wts[i];
+      if (wt >= 1) continue;
+      // bilinear sample of the coarse level
+      const fx = Math.min(W2 - 1, Math.max(0, (x + 0.5) / 2 - 0.5)), fy = Math.min(H2 - 1, Math.max(0, (y + 0.5) / 2 - 0.5));
+      const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(W2 - 1, x0 + 1), y1 = Math.min(H2 - 1, y0 + 1);
+      const ax = fx - x0, ay = fy - y0;
       for (let k = 0; k < 3; k++) {
-        so[k] += O[i + k]; sa[k] += A[i + k];
-        qo[k] += O[i + k] * O[i + k]; qa[k] += A[i + k] * A[i + k];
+        const c = (v2[(y0 * W2 + x0) * 3 + k] * (1 - ax) + v2[(y0 * W2 + x1) * 3 + k] * ax) * (1 - ay) +
+                  (v2[(y1 * W2 + x0) * 3 + k] * (1 - ax) + v2[(y1 * W2 + x1) * 3 + k] * ax) * ay;
+        vals[i * 3 + k] = wt * vals[i * 3 + k] + (1 - wt) * c;
       }
-      n++;
+      wts[i] = 1;
     }
-    if (n < 200) return;
-    const gain = [], bias = [];
-    for (let k = 0; k < 3; k++) {
-      const mo = so[k] / n, ma = sa[k] / n;
-      const vo = Math.max(1, qo[k] / n - mo * mo), va = Math.max(1, qa[k] / n - ma * ma);
-      const g = Math.min(1.15, Math.max(0.87, Math.sqrt(vo / va)));
-      gain[k] = g; bias[k] = mo - g * ma;
+  }
+
+  function seamless(origCanvas, warpCtx, maskCanvas, w, h) {
+    // Work on a small copy — the correction is smooth by nature.
+    const sc = Math.min(1, 360 / Math.max(w, h));
+    const sw = Math.max(4, Math.round(w * sc)), sh = Math.max(4, Math.round(h * sc));
+    const grab = src => { const c = canvas(sw, sh), x = c.getContext('2d'); x.drawImage(src, 0, 0, sw, sh); return x.getImageData(0, 0, sw, sh).data; };
+    const O = grab(origCanvas), A = grab(warpCtx.canvas), M = grab(maskCanvas);
+
+    const n = sw * sh, vals = new Float32Array(n * 3), wts = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      // known = clearly outside every treated area, and covered by the AI image
+      if (M[i * 4 + 3] < 6 && A[i * 4 + 3] > 250) {
+        wts[i] = 1;
+        for (let k = 0; k < 3; k++) vals[i * 3 + k] = O[i * 4 + k] - A[i * 4 + k];
+      }
     }
-    for (let i = 0; i < A.length; i += 4) {
-      if (A[i + 3] === 0) continue;
-      for (let k = 0; k < 3; k++) A[i + k] = A[i + k] * gain[k] + bias[k];
+    pushPull(vals, wts, sw, sh);
+
+    // Encode the offset (±127) into an image, upscale smoothly, apply at full size.
+    const oc = canvas(sw, sh), ox = oc.getContext('2d'), od = ox.createImageData(sw, sh);
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < 3; k++) od.data[i * 4 + k] = Math.max(0, Math.min(255, Math.round(vals[i * 3 + k] + 128)));
+      od.data[i * 4 + 3] = 255;
+    }
+    ox.putImageData(od, 0, 0);
+    const big = canvas(w, h), bx = big.getContext('2d', { willReadFrequently: true });
+    bx.imageSmoothingQuality = 'high';
+    bx.drawImage(oc, 0, 0, w, h);
+    const D = bx.getImageData(0, 0, w, h).data;
+    const wd = warpCtx.getImageData(0, 0, w, h), P = wd.data;
+    for (let i = 0; i < P.length; i += 4) {
+      if (!P[i + 3]) continue;
+      P[i] += D[i] - 128; P[i + 1] += D[i + 1] - 128; P[i + 2] += D[i + 2] - 128;
     }
     warpCtx.putImageData(wd, 0, 0);
   }
@@ -301,7 +336,7 @@
     const octx = out.getContext('2d', { willReadFrequently: true });
     octx.drawImage(original, 0, 0, w, h);
 
-    try { colorMatch(octx, wctx, origL, mask, w, h); } catch { /* cross-origin or tiny face: skip */ }
+    try { seamless(out, wctx, mask, w, h); } catch (e) { console.warn('seamless blend skipped', e); }
 
     wctx.globalCompositeOperation = 'destination-in';
     wctx.drawImage(mask, 0, 0);

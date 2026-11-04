@@ -60,6 +60,7 @@ function buildPrompt() {
   const items = CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id));
   const lines = items.map(([id, v], i) => `${i + 1}. ${byId[id].prompt(scaler(strength(byId[id], v)))}`);
   const hasSkin = items.some(([id]) => byId[id].cat === 'skin');
+  const hasShape = items.some(([id]) => byId[id].cat !== 'skin');
 
   return [
     `Using the provided photo of this person, make ONLY the following ${lines.length > 1 ? lines.length + ' changes' : 'change'}. ` +
@@ -67,6 +68,7 @@ function buildPrompt() {
     '',
     ...lines,
     '',
+    ...(hasShape ? ['Shape and volume changes must be real changes of the 3D form and outline of the face — NOT makeup, highlighter, contour, blush or lighting effects. Keep the skin color, brightness and lighting the same as in the original photo.', ''] : []),
     'Keep everything else exactly the same: the same person and identity, eyes, eye color, nose, mouth, hair, expression, ' +
       'head position, camera angle, framing, lighting, colors, background and clothing — except where a change above requires it.',
     hasSkin
