@@ -58,8 +58,8 @@
       case 'lips':
         // Natural result (like real before/after photos): same lip shape, rounded,
         // fuller in the centre and softly less toward the corners; upper lip gains more.
-        // 1 mL (Balanced) ≈ +60% upper / +40% lower lip height at the centre.
-        lipStretch(1.15, 0.78, 2);
+        // 1 mL (Balanced) ≈ +40% upper / +25% lower lip height at the centre; 3 mL ≈ +75% / +50%.
+        lipStretch(0.75, 0.5, 2);
         break;
         break;
       case 'lipFlip':
