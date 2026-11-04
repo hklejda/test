@@ -42,40 +42,36 @@ function rangeText(t) {
 }
 
 /* ================= Prompt ================= */
-function intensityWord(t, v) {
-  const base = t.type === 'level' ? v / 3 : v / t.max;
-  const f = base * STYLES.find(s => s.id === state.style).factor;
-  if (f <= 0.34) return 'a noticeable';
-  if (f <= 0.67) return 'a clearly visible';
-  if (f <= 1.0) return 'a strong, obvious';
-  return 'a very strong, dramatic (but anatomically realistic)';
+// 0.4 … 1.0 depending on dose/level, times the result-style factor.
+function strength(t, v) {
+  const base = t.type === 'level'
+    ? [0, 0.45, 0.72, 1][v]
+    : 0.4 + 0.6 * (t.max === t.min ? 1 : (v - t.min) / (t.max - t.min));
+  return base * STYLES.find(s => s.id === state.style).factor;
 }
 
-const STYLE_LINE = {
-  natural: 'Overall look: natural and harmonious — but every listed change must still be clearly visible in a side-by-side comparison.',
-  balanced: 'Overall look: clearly visible, harmonious, natural result. Every listed change must be obvious in a side-by-side comparison.',
-  enhanced: 'Overall look: bold, obvious, well-defined result, still anatomically realistic.',
-};
+// k(n, cap): scale percentage n by strength, round to 5, keep within [10, cap].
+function scaler(f) {
+  return (n, cap = 95) => Math.max(10, Math.min(cap, Math.round((n * f) / 5) * 5));
+}
 
 function buildPrompt() {
   if (!state.plan.size) return '';
-  const lines = CATEGORIES.flatMap(c =>
-    [...state.plan].filter(([id]) => byId[id].cat === c.id)
-      .map(([id, v]) => '- ' + byId[id].prompt(intensityWord(byId[id], v), fmtNum(v))));
-  const hasSkin = [...state.plan.keys()].some(id => ['skin'].includes(byId[id].cat));
+  const items = CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id));
+  const lines = items.map(([id, v], i) => `${i + 1}. ${byId[id].prompt(scaler(strength(byId[id], v)))}`);
+  const hasSkin = items.some(([id]) => byId[id].cat === 'skin');
 
   return [
-    'Edit this photo to show the AFTER result of the following aesthetic treatments on this same person.',
-    'The changes must be clearly visible when the before and after photos are compared side by side — do not return an unchanged image.',
+    `Using the provided photo of this person, make ONLY the following ${lines.length > 1 ? lines.length + ' changes' : 'change'}. ` +
+      'Each change must be clearly visible when the before and after photos are compared side by side; do not return the photo unchanged.',
     '',
-    'TREATMENTS TO APPLY:',
     ...lines,
     '',
-    STYLE_LINE[state.style],
-    '',
-    'KEEP UNCHANGED: identity, face shape outside the treated areas, eyes and eye color, hair, expression, pose, head position, camera angle, framing, lighting, background and clothing.',
-    hasSkin ? 'Do not add makeup or filters.' : 'Do not add makeup or filters, and do not retouch or smooth the skin.',
-    'Photorealistic, like a real clinical after photo taken in the same session.',
+    'Keep everything else exactly the same: the same person and identity, eyes, eye color, nose, mouth, hair, expression, ' +
+      'head position, camera angle, framing, lighting, colors, background and clothing — except where a change above requires it.',
+    hasSkin
+      ? 'Photorealistic result with real skin texture and pores (no airbrushed or plastic look), no makeup, no filters.'
+      : 'Do not retouch or smooth the skin. Photorealistic result, no makeup, no filters.',
   ].join('\n');
 }
 
