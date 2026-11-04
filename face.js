@@ -118,7 +118,7 @@
       case 'forehead': {
         // Whole forehead: from just above the brows up past the top landmarks (hairline).
         const bottom = [...R_BROW_TOP, ...L_BROW_TOP.slice().reverse()].map(i => off(P(i), 0, -0.02));
-        const top = [284, 332, 297, 338, 10, 109, 67, 103, 54].map(i => off(P(i), 0, -0.08));
+        const top = [284, 332, 297, 338, 10, 109, 67, 103, 54].map(i => off(P(i), 0, -0.11));
         return { add: [p([...bottom, ...top], 0.02)] };
       }
       case 'glabella':   return { add: [e(P(9), 0.08, 0.08)] };
