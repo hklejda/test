@@ -45,13 +45,22 @@
 
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
+    // Lip expansion: lips grow away from the line where they meet (stomion);
+    // eu/el = relative growth of upper/lower lip height, tapered toward the corners.
+    const lipStretch = (eu, el) => out.push({
+      t: 'L', c: mouth, ang, halfW: lipW * 0.62,
+      hu: Math.max(dist(P(0), P(13)), 0.015 * W), hl: Math.max(dist(P(14), P(17)), 0.02 * W),
+      eu: eu * f, el: el * f,
+    });
 
     switch (id) {
       case 'lips':
-        bulge(mouth, lipW * 0.62, lipH * 1.0, 0.10, 0.30);
+        // Calibrated on real before/after: 1 mL ≈ +55% upper, +35% lower lip height (Balanced).
+        lipStretch(1.08, 0.68);
+        bulge(mouth, lipW * 0.6, lipH * 0.9, 0.05, 0);          // slight extra width/projection
         break;
       case 'lipFlip':
-        bulge(mid(P(0), P(13)), lipW * 0.55, lipH * 0.45, 0.03, 0.22);
+        lipStretch(0.45, 0);
         break;
       case 'gummy':
         push(P(0), 0.13 * W, 0.08 * W, 0, 0.016);
@@ -125,6 +134,10 @@
     // Only process the region the deformations touch.
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (const d of D) {
+      if (d.t === 'L') {           // bounding radius for lip stretch
+        d.rx = d.halfW;
+        d.ry = Math.max(d.hu * (1 + d.eu) + d.hu * 1.4, d.hl * (1 + d.el) + d.hl * 1.4);
+      }
       const r = Math.max(d.rx, d.ry) + 2;
       x0 = Math.min(x0, d.c.x - r); y0 = Math.min(y0, d.c.y - r);
       x1 = Math.max(x1, d.c.x + r); y1 = Math.max(y1, d.c.y + r);
@@ -142,6 +155,23 @@
         for (const d of D) {
           const rx = x - d.c.x, ry = y - d.c.y;
           const lx = rx * d.cos + ry * d.sin, ly = -rx * d.sin + ry * d.cos;   // into face frame
+          if (d.t === 'L') {
+            const u = lx / d.halfW;
+            if (u <= -1 || u >= 1) continue;
+            const wx = (1 - u * u) * (1 - u * u);
+            const up = ly < 0, Y = Math.abs(ly), h = up ? d.hu : d.hl, e = (up ? d.eu : d.el) * wx;
+            if (!e) continue;
+            const Hn = h * (1 + e), B = h * 1.4;
+            let srcY;
+            if (Y <= Hn) srcY = Y / (1 + e);                       // lip body: stretched
+            else if (Y <= Hn + B) {                                 // skin above/below: eases back
+              const t = (Y - Hn) / B, sm = t * t * (3 - 2 * t);
+              srcY = Y - h * e * (1 - sm);
+            } else continue;
+            const dy = (up ? -srcY : srcY) - ly;                    // local offset (face frame)
+            ox += -dy * d.sin; oy += dy * d.cos;
+            continue;
+          }
           const s2 = (lx / d.rx) ** 2 + (ly / d.ry) ** 2;
           if (s2 >= 1) continue;
           const fall = (1 - s2) * (1 - s2);
