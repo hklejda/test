@@ -89,7 +89,10 @@
     const skinCut = [p(pts(R_EYE), 0.02), p(pts(L_EYE), 0.02), l(pts(R_BROW), 0.05), l(pts(L_BROW), 0.05), p(pts(LIPS), 0.005)];
     const faceSkin = [p(pts(OVAL), 0.015)];
     const underEyes = (rx, ry) => [e(off(P(145), 0, 0.06), rx, ry), e(off(P(374), 0, 0.06), rx, ry)];
-    const cheeks = [e(off(mid(P(50), P(117)), 0, -0.01), 0.15, 0.12), e(off(mid(P(280), P(346)), 0, -0.01), 0.15, 0.12)];
+    const cheeks = [
+      e(off(mid(P(50), P(117)), -0.02, -0.01), 0.19, 0.15), e(off(mid(P(280), P(346)), 0.02, -0.01), 0.19, 0.15),
+      l(pts([127, 234, 93, 132]), 0.09), l(pts([356, 454, 323, 361]), 0.09),
+      e(off(P(205), 0, 0.02), 0.09, 0.08), e(off(P(425), 0, 0.02), 0.09, 0.08)];
     const jawLine = [l(pts(JAW), 0.11)];
     const jowls = [e(off(P(136), 0.02, -0.02), 0.1, 0.09), e(off(P(365), -0.02, -0.02), 0.1, 0.09)];
     const naso = [

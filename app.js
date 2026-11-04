@@ -45,34 +45,37 @@ function rangeText(t) {
 function intensityWord(t, v) {
   const base = t.type === 'level' ? v / 3 : v / t.max;
   const f = base * STYLES.find(s => s.id === state.style).factor;
-  if (f <= 0.34) return 'subtle';
-  if (f <= 0.67) return 'moderate';
-  if (f <= 1.0) return 'clearly visible';
-  return 'strong, well-defined';
+  if (f <= 0.34) return 'a noticeable';
+  if (f <= 0.67) return 'a clearly visible';
+  if (f <= 1.0) return 'a strong, obvious';
+  return 'a very strong, dramatic (but anatomically realistic)';
 }
 
 const STYLE_LINE = {
-  natural: 'Overall the result must be subtle and very natural — someone who knows the person would only notice they look fresher.',
-  balanced: 'Overall the result should be clearly visible but still natural and harmonious.',
-  enhanced: 'Overall the result should be noticeably enhanced and well-defined, while remaining anatomically realistic.',
+  natural: 'Overall look: natural and harmonious — but every listed change must still be clearly visible in a side-by-side comparison.',
+  balanced: 'Overall look: clearly visible, harmonious, natural result. Every listed change must be obvious in a side-by-side comparison.',
+  enhanced: 'Overall look: bold, obvious, well-defined result, still anatomically realistic.',
 };
 
 function buildPrompt() {
   if (!state.plan.size) return '';
-  const groups = CATEGORIES.map(c => {
-    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id);
-    if (!items.length) return null;
-    return [`${c.name}:`, ...items.map(([id, v]) => '- ' + byId[id].prompt(intensityWord(byId[id], v), fmtNum(v)))].join('\n');
-  }).filter(Boolean);
+  const lines = CATEGORIES.flatMap(c =>
+    [...state.plan].filter(([id]) => byId[id].cat === c.id)
+      .map(([id, v]) => '- ' + byId[id].prompt(intensityWord(byId[id], v), fmtNum(v))));
+  const hasSkin = [...state.plan.keys()].some(id => ['skin'].includes(byId[id].cat));
 
   return [
-    'Photorealistic aesthetic-treatment simulation of this exact same person, as a post-treatment clinical photo.',
-    'Keep identity, bone structure, skin tone, real skin texture and pores, hair, expression, pose, lighting, background and framing exactly the same.',
-    'Apply ONLY the following treatments:',
+    'Edit this photo to show the AFTER result of the following aesthetic treatments on this same person.',
+    'The changes must be clearly visible when the before and after photos are compared side by side — do not return an unchanged image.',
     '',
-    ...groups.flatMap(g => [g, '']),
+    'TREATMENTS TO APPLY:',
+    ...lines,
+    '',
     STYLE_LINE[state.style],
-    'Do not add makeup, filters or beauty retouching, do not change age or ethnicity, and make no other changes. Output must look like a real unedited photograph.',
+    '',
+    'KEEP UNCHANGED: identity, face shape outside the treated areas, eyes and eye color, hair, expression, pose, head position, camera angle, framing, lighting, background and clothing.',
+    hasSkin ? 'Do not add makeup or filters.' : 'Do not add makeup or filters, and do not retouch or smooth the skin.',
+    'Photorealistic, like a real clinical after photo taken in the same session.',
   ].join('\n');
 }
 
@@ -398,6 +401,7 @@ function showVersion(i) {
   const v = state.versions[i];
   $('beforeImg').src = state.photo;
   $('afterImg').src = v.url;
+  $('rawViewBtn').hidden = !v.protect;
   $('singleImg').hidden = true;
   $('compare').hidden = false;
   setView(state.view);
@@ -415,10 +419,14 @@ function setSplit(p) {
 $('compareRange').addEventListener('input', e => setSplit(Number(e.target.value)));
 
 function setView(view) {
+  const v = state.versions[state.current];
+  if (view === 'raw' && !(v && v.protect)) view = 'compare';
   state.view = view;
+  if (v) $('afterImg').src = view === 'raw' ? v.raw : v.url;
+  $('compare').querySelector('.tag-r').textContent = view === 'raw' ? 'Raw AI' : 'After';
   const c = $('compare');
   c.classList.toggle('side', view === 'side');
-  c.classList.toggle('after', view === 'after');
+  c.classList.toggle('after', view === 'after' || view === 'raw');
   if (view === 'compare') setSplit(Number($('compareRange').value));
   $('viewToggle').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
 }
