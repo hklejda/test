@@ -39,9 +39,6 @@ const TREATMENTS = [
   { id: 'tearTrough', cat: 'filler', name: 'Tear troughs', area: 'Eyes', type: 'dose', min: 0.5, max: 1.5, step: 0.5, def: 1,
     desc: 'Fill under-eye hollows',
     prompt: k => `UNDER-EYE HOLLOWS — fill the hollows and grooves under both eyes, reducing them by about ${k(85)}%: a smooth, flat transition from the lower eyelid to the cheek, with fewer shadows. Don't change the eyes themselves.` },
-  { id: 'temples', cat: 'filler', name: 'Temples', area: 'Upper face', type: 'dose', min: 1, max: 4, step: 0.5, def: 2,
-    desc: 'Restore temple hollowing',
-    prompt: k => `TEMPLES — add volume to the temples (the sides of the forehead next to the eyes) so any hollowing is about ${k(70)}% filled and they look smooth and slightly rounded.` },
 
   // ---------- Botulinum toxin ----------
   { id: 'forehead', cat: 'botox', name: 'Forehead lines', area: 'Upper face', type: 'dose', min: 6, max: 20, step: 2, def: 10,

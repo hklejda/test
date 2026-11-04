@@ -11,7 +11,7 @@
 
 (function () {
   const SHAPE = new Set([
-    'lips', 'cheeks', 'chin', 'jawline', 'temples',
+    'lips', 'cheeks', 'chin', 'jawline',
     'browLift', 'lipFlip', 'gummy', 'masseter',
     'doubleChin', 'buccal', 'jowls', 'threads', 'tightening',
   ]);
