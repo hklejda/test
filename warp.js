@@ -40,8 +40,8 @@
     const bulge = (c, rx, ry, ax, ay) => out.push({ t: 'b', c, rx, ry, ax: ax * f, ay: ay * f, ang });
     const push = (c, rx, ry, dx, dy) => { const v = vec(dx * f, dy * f); out.push({ t: 'p', c, rx, ry, vx: v.x, vy: v.y, ang }); };
     // side = -1 → person's right (image left), +1 → person's left
-    const sides = fn => { fn(-1, { cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
-                          fn(+1, { cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
+    const sides = fn => { fn(-1, { apexHigh: P(116), lowCheekMid: P(207), zygHigh: mid(P(234), P(127)), cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
+                          fn(+1, { apexHigh: P(345), lowCheekMid: P(427), zygHigh: mid(P(454), P(356)), cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
 
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
@@ -57,10 +57,11 @@
         push(P(0), 0.13 * W, 0.08 * W, 0, 0.016);
         break;
       case 'cheeks':
+        // Lift + high cheekbone projection. No mid-face widening (that looks puffy/square).
         sides((sx, p) => {
-          bulge(p.cheek, 0.16 * W, 0.14 * W, 0.24, 0.24);
-          push(p.zyg, 0.13 * W, 0.15 * W, 0.034 * sx, -0.008);
-          push(p.cheek, 0.2 * W, 0.18 * W, 0.006 * sx, -0.018);
+          push(off(p.lowCheekMid, 0, 0.01), 0.18 * W, 0.16 * W, 0.006 * sx, -0.036);
+          push(off(p.zygHigh, -0.01 * sx, 0.03), 0.10 * W, 0.12 * W, 0.022 * sx, -0.012);
+          bulge(off(p.apexHigh, 0.01 * sx, 0.03), 0.11 * W, 0.09 * W, 0.14, 0.14);
         });
         break;
       case 'chin':
