@@ -59,7 +59,7 @@
       case 'cheeks':
         // Lift + high cheekbone projection. No mid-face widening (that looks puffy/square).
         sides((sx, p) => {
-          push(off(p.lowCheekMid, 0, 0.01), 0.18 * W, 0.16 * W, 0.006 * sx, -0.036);
+          push(off(p.lowCheekMid, 0.035 * sx, 0), 0.15 * W, 0.16 * W, 0.006 * sx, -0.036);   // kept away from the mouth corners
           push(off(p.zygHigh, -0.01 * sx, 0.03), 0.10 * W, 0.12 * W, 0.022 * sx, -0.012);
           bulge(off(p.apexHigh, 0.01 * sx, 0.03), 0.11 * W, 0.09 * W, 0.14, 0.14);
         });
