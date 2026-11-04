@@ -44,9 +44,10 @@ function rangeText(t) {
 /* ================= Prompt ================= */
 // 0.4 … 1.0 depending on dose/level, times the result-style factor.
 function strength(t, v) {
+  // Dose treatments: effect grows with the actual amount (0.5 mL vs 1 mL is a clear step).
   const base = t.type === 'level'
     ? [0, 0.45, 0.72, 1][v]
-    : 0.4 + 0.6 * (t.max === t.min ? 1 : (v - t.min) / (t.max - t.min));
+    : Math.pow(v / t.max, 0.75);
   return base * STYLES.find(s => s.id === state.style).factor;
 }
 
