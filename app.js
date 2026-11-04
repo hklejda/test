@@ -28,7 +28,7 @@ const store = {
 };
 
 /* ================= Formatting ================= */
-function fmtNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
+function fmtNum(n) { return String(Math.round(n * 100) / 100); }
 
 function doseText(t, v) {
   if (t.type === 'level') return LEVELS[v];

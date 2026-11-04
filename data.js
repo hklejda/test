@@ -8,9 +8,9 @@
 //   units it cannot visualise ("2 mL filler").
 
 const CATEGORIES = [
-  { id: 'filler',  name: 'Dermal Fillers',  short: 'Fillers',    icon: '💧', unit: 'mL', blurb: 'Hyaluronic acid volume and contour' },
-  { id: 'botox',   name: 'Botulinum Toxin', short: 'Botox',      icon: '✦',  unit: 'U',  blurb: 'Relax expression lines and reshape' },
-  { id: 'skin',    name: 'Skin Treatments', short: 'Skin',       icon: '✧',  unit: null, blurb: 'Quality, tone, texture and glow' },
+  { id: 'filler',  name: 'Dermal Fillers',  short: 'Fillers',    icon: '💧', unit: 'mL', blurb: 'Hyaluronic acid, mL per session (both sides for paired areas)' },
+  { id: 'botox',   name: 'Botulinum Toxin', short: 'Botox',      icon: '✦',  unit: 'U',  blurb: 'Units of onabotulinumtoxinA (Botox®), total for the area' },
+  { id: 'skin',    name: 'Skin Treatments', short: 'Skin',       icon: '✧',  unit: null, blurb: 'Skin quality, scars, pigmentation and firmness' },
   { id: 'contour', name: 'Contouring',      short: 'Contouring', icon: '◇',  unit: null, blurb: 'Fat reduction and lifting' },
 ];
 
@@ -18,7 +18,7 @@ const LEVELS = ['', 'Light', 'Medium', 'Intensive'];
 
 const TREATMENTS = [
   // ---------- Dermal fillers ----------
-  { id: 'lips', cat: 'filler', name: 'Lips', area: 'Lips', type: 'dose', min: 0.5, max: 3, step: 0.5, def: 1,
+  { id: 'lips', cat: 'filler', name: 'Lips', area: 'Lips', type: 'dose', min: 0.5, max: 2, step: 0.5, def: 1,
     desc: 'Volume, shape and border definition',
     prompt: k => `LIPS — increase the volume of both lips by about ${k(60, 90)}%: the upper and lower lip become physically bigger, thicker and more projected (as with lip filler), with a naturally defined border. Same lip color, no lipstick or lip liner.` },
   { id: 'cheeks', cat: 'filler', name: 'Cheeks / Midface', area: 'Cheeks', type: 'dose', min: 1, max: 4, step: 0.5, def: 2,
@@ -36,13 +36,13 @@ const TREATMENTS = [
   { id: 'marionette', cat: 'filler', name: 'Marionette lines', area: 'Lower face', type: 'dose', min: 0.5, max: 2, step: 0.5, def: 1,
     desc: 'Soften lines below mouth corners',
     prompt: k => `MARIONETTE LINES — make the lines running down from the corners of the mouth toward the chin about ${k(85)}% shallower, and lift the mouth corners slightly so they don't turn down.` },
-  { id: 'tearTrough', cat: 'filler', name: 'Tear troughs', area: 'Eyes', type: 'dose', min: 0.5, max: 2, step: 0.5, def: 1,
+  { id: 'tearTrough', cat: 'filler', name: 'Tear troughs', area: 'Eyes', type: 'dose', min: 0.5, max: 1.5, step: 0.5, def: 1,
     desc: 'Fill under-eye hollows',
     prompt: k => `UNDER-EYE HOLLOWS — fill the hollows and grooves under both eyes, reducing them by about ${k(85)}%: a smooth, flat transition from the lower eyelid to the cheek, with fewer shadows. Don't change the eyes themselves.` },
   { id: 'temples', cat: 'filler', name: 'Temples', area: 'Upper face', type: 'dose', min: 1, max: 4, step: 0.5, def: 2,
     desc: 'Restore temple hollowing',
     prompt: k => `TEMPLES — add volume to the temples (the sides of the forehead next to the eyes) so any hollowing is about ${k(70)}% filled and they look smooth and slightly rounded.` },
-  { id: 'nose', cat: 'filler', name: 'Non-surgical nose', area: 'Nose', type: 'dose', min: 0.5, max: 1.5, step: 0.5, def: 0.5,
+  { id: 'nose', cat: 'filler', name: 'Non-surgical nose', area: 'Nose', type: 'dose', min: 0.25, max: 1, step: 0.25, def: 0.5,
     desc: 'Straighten bridge, lift tip',
     prompt: k => `NOSE — make the nose bridge straighter and smoother (hide any bump) and lift the nose tip slightly; about ${k(50, 70)}% correction. Do not make the nose wider or bigger.` },
 
@@ -50,7 +50,7 @@ const TREATMENTS = [
   { id: 'forehead', cat: 'botox', name: 'Forehead lines', area: 'Upper face', type: 'dose', min: 6, max: 20, step: 2, def: 10,
     desc: 'Smooth horizontal lines',
     prompt: k => `FOREHEAD — remove about ${k(90)}% of the horizontal forehead wrinkles, so the forehead skin looks smooth and relaxed.` },
-  { id: 'glabella', cat: 'botox', name: 'Frown lines (glabella)', area: 'Upper face', type: 'dose', min: 10, max: 25, step: 5, def: 20,
+  { id: 'glabella', cat: 'botox', name: 'Frown lines (glabella)', area: 'Upper face', type: 'dose', min: 10, max: 30, step: 5, def: 20,
     desc: '"11" lines between the brows',
     prompt: k => `FROWN LINES — remove about ${k(90)}% of the vertical "11" wrinkles between the eyebrows, so that area is smooth.` },
   { id: 'crowsFeet', cat: 'botox', name: "Crow's feet", area: 'Eyes', type: 'dose', min: 12, max: 30, step: 2, def: 24,
@@ -62,19 +62,19 @@ const TREATMENTS = [
   { id: 'bunny', cat: 'botox', name: 'Bunny lines', area: 'Nose', type: 'dose', min: 4, max: 10, step: 2, def: 6,
     desc: 'Lines on the sides of the nose',
     prompt: k => `BUNNY LINES — remove about ${k(90)}% of the small wrinkles on the sides of the upper nose.` },
-  { id: 'lipFlip', cat: 'botox', name: 'Lip flip', area: 'Lips', type: 'dose', min: 4, max: 8, step: 2, def: 6,
+  { id: 'lipFlip', cat: 'botox', name: 'Lip flip', area: 'Lips', type: 'dose', min: 2, max: 8, step: 2, def: 4,
     desc: 'Slightly more visible upper lip',
     prompt: k => `UPPER LIP FLIP — roll the upper lip slightly outward so about ${k(40, 60)}% more of the pink upper lip is visible. Don't change the lower lip.` },
   { id: 'gummy', cat: 'botox', name: 'Gummy smile', area: 'Lips', type: 'dose', min: 2, max: 6, step: 2, def: 4,
     desc: 'Less gum showing when smiling',
     prompt: k => `GUMMY SMILE — lower the upper lip slightly so about ${k(70)}% less gum is visible above the upper teeth.` },
-  { id: 'masseter', cat: 'botox', name: 'Masseter / jaw slimming', area: 'Jaw', type: 'dose', min: 40, max: 100, step: 10, def: 50,
+  { id: 'masseter', cat: 'botox', name: 'Masseter / jaw slimming', area: 'Jaw', type: 'dose', min: 40, max: 100, step: 10, def: 60,
     desc: 'Slimmer lower face (both sides)',
     prompt: k => `JAW SLIMMING — make the lower face about ${k(20, 30)}% narrower at the jaw angles (below the ears on both sides), giving a slimmer, more V-shaped face. Move the face outline inward there.` },
   { id: 'mentalis', cat: 'botox', name: 'Chin dimpling', area: 'Chin', type: 'dose', min: 4, max: 10, step: 2, def: 6,
     desc: 'Smooth "orange peel" chin',
     prompt: k => `CHIN SKIN — remove about ${k(85)}% of the dimpled, "orange-peel" texture on the chin, so the chin skin is smooth.` },
-  { id: 'platysma', cat: 'botox', name: 'Neck bands (Nefertiti)', area: 'Neck', type: 'dose', min: 20, max: 60, step: 10, def: 30,
+  { id: 'platysma', cat: 'botox', name: 'Neck bands (Nefertiti)', area: 'Neck', type: 'dose', min: 20, max: 60, step: 10, def: 40,
     desc: 'Smoother neck, sharper jaw line',
     prompt: k => `NECK — soften the vertical neck bands by about ${k(75)}% and make the jawline look crisper and more lifted.` },
 
@@ -82,12 +82,6 @@ const TREATMENTS = [
   { id: 'booster', cat: 'skin', name: 'Skin booster', area: 'Full face', type: 'level', def: 2,
     desc: 'Hydration and healthy glow',
     prompt: k => `SKIN GLOW — make the facial skin about ${k(60, 80)}% more hydrated and radiant: dewy, plump skin with a healthy glow and softer fine lines.` },
-  { id: 'peel', cat: 'skin', name: 'Chemical peel', area: 'Full face', type: 'level', def: 2,
-    desc: 'Even tone, fresher skin',
-    prompt: k => `SKIN TONE — remove about ${k(75)}% of redness, blotchiness and dullness, so the facial skin looks brighter, fresher and more even in tone.` },
-  { id: 'microneedling', cat: 'skin', name: 'Microneedling', area: 'Full face', type: 'level', def: 2,
-    desc: 'Refine texture and pores',
-    prompt: k => `SKIN TEXTURE — make the pores about ${k(50, 70)}% smaller and the skin texture smoother and more refined, with fewer fine lines and shallow scars.` },
   { id: 'laser', cat: 'skin', name: 'Laser resurfacing', area: 'Full face', type: 'level', def: 2,
     desc: 'Fine lines and texture',
     prompt: k => `RESURFACING — remove about ${k(75)}% of fine lines, wrinkles and rough texture on the face, so the skin looks smoother, tighter and more even.` },
