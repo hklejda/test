@@ -312,7 +312,7 @@
   //   result = AI − blur(AI) + blur(original)   inside those areas
   // Shine, whitening and "glow" are broad (low-frequency) and get removed; scars,
   // spots, pores and wrinkles are fine (high-frequency) and are kept.
-  const DETAIL = new Set(['booster', 'laser', 'pigment', 'acne', 'forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis', 'platysma']);
+  const DETAIL = new Set(['booster', 'laser', 'pigment', 'acne', 'platysma']);   // wrinkles excluded: deep lines are wide, keep the AI's full fix
 
   function blurred(src, w, h, sigma) {
     const c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });

@@ -56,8 +56,12 @@ function scaler(f) {
   return (n, cap = 95) => Math.max(10, Math.min(cap, Math.round((n * f) / 5) * 5));
 }
 
-const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && !Warp.isShape(id)));
-const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id));
+// Wrinkle treatments: AI in photos (cleanest result), fast filter in Live (and as fallback without a key).
+const WRINKLE = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis']);
+const wrinkleViaAI = id => WRINKLE.has(id) && !!store.get('fal_key');
+const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && (!Warp.isShape(id) || wrinkleViaAI(id))));
+const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id) && !wrinkleViaAI(id));
+const liveItems = () => [...state.plan].filter(([id]) => Warp.isShape(id));
 
 function buildPrompt() {
   const items = aiItems();
@@ -137,7 +141,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
+    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? 'AI · live preview' : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';
@@ -650,7 +654,7 @@ function liveStatus(kind) {
   const text = kind === 'loading' ? 'Starting face tracking…'
     : kind === 'noface' ? 'Face not found — look at the camera'
     : !state.plan.size ? 'Select treatments on the right to see them live'
-    : !shapeItems().length ? 'Select a treatment on the right (AI treatments are hidden in Live)'
+    : !liveItems().length ? 'Select a treatment on the right (AI treatments are hidden in Live)'
     : '';
   el.hidden = !text;
   if (text && el.textContent !== text) el.textContent = text;
@@ -682,7 +686,7 @@ async function startLive() {
   try {
     await Live.start({
       video: v, canvas: $('liveCanvas'), overlay: $('liveOverlay'),
-      getItems: () => shapeItems().map(([id, val]) => [id, strength(byId[id], val)]),
+      getItems: () => liveItems().map(([id, val]) => [id, strength(byId[id], val)]),
       onStatus: liveStatus,
     });
   } catch (err) {
