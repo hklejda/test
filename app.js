@@ -223,6 +223,7 @@ function renderStyles() {
 }
 
 function changed() {
+  if (state.live) liveStatus('ok');
   renderBuilder();
   renderPlan();
   refreshPrompt();
@@ -315,6 +316,11 @@ async function mapFace(dataUrl) {
     if (!L) { setFaceStatus('missing', '⚠ No face found. Use a clear, front-facing photo.'); return; }
     state.faceL = L;
     setFaceStatus('ok', '✓ Face mapped — only the selected areas will change');
+    if (state.autoGenerate) {                         // captured from Live: show the result right away
+      state.autoGenerate = false;
+      if (state.plan.size && !aiItems().length && !$('applyBtn').disabled) $('applyBtn').click();
+      else if (aiItems().length) showError('Photo captured. Click "Generate" to apply the skin & wrinkle (AI) treatments too.');
+    }
     if (state.showAreas) renderAreas();
   } catch (err) {
     console.error(err);
@@ -344,6 +350,7 @@ $('protectToggle').addEventListener('change', updateUI);
 $('fileInput').addEventListener('change', e => {
   const file = e.target.files?.[0];
   if (!file) return;
+  if (state.live) stopLive();
   stopCamera();
   const img = new Image();
   img.onload = () => { setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight)); URL.revokeObjectURL(img.src); };
@@ -354,6 +361,7 @@ $('fileInput').addEventListener('change', e => {
 
 $('cameraBtn').addEventListener('click', async () => {
   showError('');
+  if (state.live) stopLive();
   if (!navigator.mediaDevices?.getUserMedia) { showError('Camera not available in this browser — use Upload.'); return; }
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({
@@ -632,6 +640,84 @@ $('saveSettings').addEventListener('click', () => {
   store.set('clinic_name', $('clinicInput').value.trim());
   setTimeout(updateUI, 0);
 });
+
+/* ================= Live preview ================= */
+const LIVE_UI = ['liveCanvas', 'liveBadge', 'liveCaptureBtn', 'liveHoldBtn', 'liveExitBtn', 'liveNote'];
+
+function liveStatus(kind) {
+  const el = $('liveStatus');
+  const text = kind === 'loading' ? 'Starting face tracking…'
+    : kind === 'noface' ? 'Face not found — look at the camera'
+    : !state.plan.size ? 'Select treatments on the right to see them live'
+    : !shapeItems().length ? 'Selected treatments are AI-only — capture to apply them'
+    : '';
+  el.hidden = !text;
+  if (text && el.textContent !== text) el.textContent = text;
+}
+
+async function startLive() {
+  showError('');
+  if (!Live.supported) { showError('Live preview needs a browser with WebGL2 (recent Chrome, Safari, Edge or Firefox). Use Camera or Upload instead.'); return; }
+  if (!navigator.mediaDevices?.getUserMedia) { showError('Camera not available in this browser — use Upload.'); return; }
+  stopCamera();
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+    });
+  } catch (err) {
+    showError('Camera access was blocked or failed: ' + err.message);
+    return;
+  }
+  const v = $('video');
+  v.srcObject = state.stream;
+  await v.play().catch(() => {});
+  if (v.videoWidth) $('stage').style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`;   // frame follows the camera shape
+  state.live = true;
+  ['placeholder', 'singleImg', 'compare', 'areaImg', 'video', 'camGuide', 'snapBtn', 'cancelCamBtn',
+   'viewToggle', 'downloadBtn', 'printBtn', 'resetBtn', 'faceStatus'].forEach(id => $(id).hidden = true);
+  LIVE_UI.forEach(id => $(id).hidden = false);
+  $('liveBtn').hidden = true;
+  try {
+    await Live.start({
+      video: v, canvas: $('liveCanvas'),
+      getItems: () => shapeItems().map(([id, val]) => [id, strength(byId[id], val)]),
+      onStatus: liveStatus,
+    });
+  } catch (err) {
+    console.error(err);
+    stopLive();
+    showError('Live preview could not start (' + err.message + '). Use Camera or Upload instead.');
+  }
+}
+
+function stopLive(restoreView = true) {
+  Live.stop();
+  state.live = false;
+  state.stream?.getTracks().forEach(t => t.stop());
+  state.stream = null;
+  $('video').srcObject = null;
+  LIVE_UI.concat('liveStatus').forEach(id => $(id).hidden = true);
+  $('stage').style.aspectRatio = '';
+  $('liveBtn').hidden = false;
+  if (!restoreView) return;
+  if (state.current >= 0) { $('compare').hidden = false; ['viewToggle', 'downloadBtn', 'printBtn'].forEach(id => $(id).hidden = false); }
+  else if (state.photo) $('singleImg').hidden = false;
+  else $('placeholder').hidden = false;
+  if (state.photo) { $('resetBtn').hidden = false; $('faceStatus').hidden = !$('faceStatus').textContent; }
+}
+
+$('liveBtn').addEventListener('click', startLive);
+$('liveExitBtn').addEventListener('click', () => stopLive());
+$('liveCaptureBtn').addEventListener('click', () => {
+  const frame = Live.captureFrame();
+  const data = resizeToDataURL(frame, frame.width, frame.height);
+  stopLive(false);
+  state.autoGenerate = true;
+  setPhoto(data);
+});
+const hold = on => { Live.setBypass(on); $('liveHoldBtn').classList.toggle('on', on); $('liveHoldBtn').textContent = on ? 'Before (release for after)' : 'Hold to see before'; };
+$('liveHoldBtn').addEventListener('pointerdown', e => { e.preventDefault(); hold(true); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('liveHoldBtn').addEventListener(ev, () => hold(false)));
 
 /* ================= Init ================= */
 renderStyles();

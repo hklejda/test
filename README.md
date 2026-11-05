@@ -6,6 +6,7 @@ Live: https://hklejda.github.io/test/
 
 ## Features
 
+- **Live preview (Snapchat-style):** real-time reshaping on the camera with face tracking (WebGL2). Adjust doses while watching, hold to see before, capture to continue with AI skin treatments and the report.
 - **Photo:** camera with face guide, or upload
 - **Treatment categories**
   - **Dermal fillers (mL):** lips, cheeks, chin, jawline, nasolabial, marionette, tear troughs
@@ -32,6 +33,7 @@ Plain HTML, CSS and JavaScript. No build step, no libraries.
 ## Files
 
 - `data.js` – treatment catalog (categories, doses, prompt text)
+- `live.js` – live camera preview: face tracking + GPU (WebGL2) rendering of the reshape treatments
 - `warp.js` – landmark-driven reshaping for shape treatments
 - `face.js` – face landmarks, treatment-area masks, alignment, colour match, protected compositing
 - `app.js` – UI, prompt builder, camera/upload, fal queue API, history, report

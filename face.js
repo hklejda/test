@@ -413,5 +413,33 @@
     return out;
   }
 
-  window.Face = { load, detect, buildMask, protect, tint, hasRegion };
+  /* ---------------- Video (live) landmarker ---------------- */
+  let videoPromise = null;
+  function loadVideo() {
+    if (!videoPromise) {
+      videoPromise = (async () => {
+        const vision = await import(CFG.bundle);
+        const fileset = await vision.FilesetResolver.forVisionTasks(CFG.wasmBase);
+        const opts = { runningMode: 'VIDEO', numFaces: 1 };
+        try {
+          return await vision.FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: CFG.model, delegate: 'GPU' }, ...opts });
+        } catch {
+          return vision.FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: CFG.model, delegate: 'CPU' }, ...opts });
+        }
+      })();
+      videoPromise.catch(() => { videoPromise = null; });
+    }
+    return videoPromise;
+  }
+
+  // Landmarks for one video frame (pixel coords), or null.
+  function detectVideo(lm, video, ts) {
+    const res = lm.detectForVideo(video, ts);
+    const f = res.faceLandmarks && res.faceLandmarks[0];
+    if (!f) return null;
+    const w = video.videoWidth, h = video.videoHeight;
+    return f.map(p => ({ x: p.x * w, y: p.y * h }));
+  }
+
+  window.Face = { load, detect, buildMask, protect, tint, hasRegion, loadVideo, detectVideo };
 })();

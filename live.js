@@ -1,0 +1,238 @@
+// Live preview — "Snapchat-style" real-time reshaping on the camera feed.
+//
+// Every frame: track the face (MediaPipe, VIDEO mode, smoothed), build the same
+// deformations the photo pipeline uses (Warp.deforms), and render them on the GPU
+// with a WebGL2 fragment shader. Shape treatments are live; AI skin treatments are
+// applied after capture (they take seconds and cost per image).
+//
+// Exposes window.Live = { supported, start, stop, setBypass, captureFrame }.
+
+(function () {
+  const MAXD = 64;
+
+  const VS = `#version 300 es
+in vec2 a;
+out vec2 uv;
+void main() { uv = a * 0.5 + 0.5; gl_Position = vec4(a, 0.0, 1.0); }`;
+
+  // Same maths as warp.js (backward mapping), one deformation per uniform slot:
+  //   d0 = (type, cx, cy, angle)   type: 0 bulge, 1 push, 2 lip stretch, 3 shadow fill
+  //   d1 = bulge (rx, ry, ax, ay) | push (rx, ry, vx, vy) | lip (halfW, taper, -, -) | shade (rx, ry, amt, -)
+  //   d2 = lip (hu, hl, eu, el) | shade (mipLevel, -, -, -)
+  const FS = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 o;
+uniform sampler2D tex;
+uniform vec2 size;
+uniform int n;
+uniform vec4 d0[${MAXD}];
+uniform vec4 d1[${MAXD}];
+uniform vec4 d2[${MAXD}];
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+void main() {
+  vec2 p = vec2(uv.x, 1.0 - uv.y) * size;
+  vec2 off = vec2(0.0);
+  for (int i = 0; i < ${MAXD}; i++) {
+    if (i >= n) break;
+    vec4 a = d0[i], b = d1[i], c = d2[i];
+    if (a.x > 2.5) continue;
+    vec2 r = p - a.yz;
+    float cs = cos(a.w), sn = sin(a.w);
+    vec2 l = vec2(r.x * cs + r.y * sn, -r.x * sn + r.y * cs);
+    if (a.x < 0.5) {
+      vec2 q = l / b.xy; float s2 = dot(q, q);
+      if (s2 >= 1.0) continue;
+      float fall = (1.0 - s2) * (1.0 - s2);
+      vec2 sl = -l * b.zw * fall;
+      off += vec2(sl.x * cs - sl.y * sn, sl.x * sn + sl.y * cs);
+    } else if (a.x < 1.5) {
+      vec2 q = l / b.xy; float s2 = dot(q, q);
+      if (s2 >= 1.0) continue;
+      float fall = (1.0 - s2) * (1.0 - s2);
+      off -= b.zw * fall;
+    } else {
+      float u = l.x / b.x;
+      if (abs(u) >= 1.0) continue;
+      float wx = pow(1.0 - u * u, b.y);
+      bool up = l.y < 0.0;
+      float Y = abs(l.y);
+      float h = up ? c.x : c.y;
+      float e = (up ? c.z : c.w) * wx;
+      if (e <= 0.0) continue;
+      float Hn = h * (1.0 + e), B = h * 1.4, srcY;
+      if (Y <= Hn) srcY = Y / (1.0 + e);
+      else if (Y <= Hn + B) { float t = (Y - Hn) / B; float sm = t * t * (3.0 - 2.0 * t); srcY = Y - h * e * (1.0 - sm); }
+      else continue;
+      float dy = (up ? -srcY : srcY) - l.y;
+      off += vec2(-dy * sn, dy * cs);
+    }
+  }
+  vec2 q = clamp(p + off, vec2(0.5), size - 0.5);
+  vec2 tuv = q / size;
+  vec3 col = texture(tex, tuv).rgb;
+
+  // Shadow fill (cheeks): lift blurred shading toward the lit-cheek level around it.
+  for (int i = 0; i < ${MAXD}; i++) {
+    if (i >= n) break;
+    vec4 a = d0[i], b = d1[i], c = d2[i];
+    if (a.x < 2.5) continue;
+    vec2 r = p - a.yz;
+    float cs = cos(a.w), sn = sin(a.w);
+    vec2 l = vec2(r.x * cs + r.y * sn, -r.x * sn + r.y * cs);
+    vec2 qq = l / b.xy; float s2 = dot(qq, qq);
+    if (s2 >= 1.0) continue;
+    float S = lum(textureLod(tex, tuv, c.x).rgb);
+    float ref = 0.0;
+    for (int k = 0; k < 8; k++) {
+      float ang = float(k) * 0.7853982;
+      vec2 lp = vec2(cos(ang) * b.x, sin(ang) * b.y) * 1.2;
+      vec2 ip = a.yz + vec2(lp.x * cs - lp.y * sn, lp.x * sn + lp.y * cs);
+      ref = max(ref, lum(textureLod(tex, clamp(ip, vec2(0.5), size - 0.5) / size, c.x + 1.0).rgb));
+    }
+    ref = min(ref, lum(textureLod(tex, a.yz / size, c.x + 2.0).rgb) * 1.25);
+    if (S < ref && S > 0.004) {
+      float w = (1.0 - s2) * (1.0 - s2);
+      float g = min(1.0 + 0.3 * b.z, 1.0 + b.z * w * (ref - S) / S);
+      col = min(col * g, vec3(1.0));
+    }
+  }
+  o = vec4(col, 1.0);
+}`;
+
+  const supported = (() => {
+    try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
+  })();
+
+  let gl = null, prog = null, texObj = null, loc = {}, raf = 0, running = false;
+  let video = null, canvas = null, getItems = null, onStatus = null, landmarker = null;
+  let smooth = null, lastTs = -1, bypass = false, missed = 0;
+  const U0 = new Float32Array(MAXD * 4), U1 = new Float32Array(MAXD * 4), U2 = new Float32Array(MAXD * 4);
+
+  function compile(type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  }
+
+  function initGL() {
+    gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+    if (!gl) throw new Error('WebGL2 not available');
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const aLoc = gl.getAttribLocation(prog, 'a');
+    gl.enableVertexAttribArray(aLoc);
+    gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+    texObj = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texObj);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    for (const k of ['tex', 'size', 'n', 'd0', 'd1', 'd2']) loc[k] = gl.getUniformLocation(prog, k);
+    gl.uniform1i(loc.tex, 0);
+  }
+
+  // Exponential smoothing of landmarks; resets on big jumps (fast head moves).
+  function smoothLandmarks(L) {
+    if (!smooth || smooth.length !== L.length) { smooth = L.map(p => ({ x: p.x, y: p.y })); return smooth; }
+    const W = Math.hypot(L[234].x - L[454].x, L[234].y - L[454].y) || 1;
+    const jump = Math.hypot(L[1].x - smooth[1].x, L[1].y - smooth[1].y) / W;
+    const a = jump > 0.08 ? 1 : 0.55;
+    for (let i = 0; i < L.length; i++) {
+      smooth[i].x += a * (L[i].x - smooth[i].x);
+      smooth[i].y += a * (L[i].y - smooth[i].y);
+    }
+    return smooth;
+  }
+
+  function pack(D, W) {
+    const n = Math.min(MAXD, D.length);
+    U0.fill(0); U1.fill(0); U2.fill(0);
+    for (let i = 0; i < n; i++) {
+      const d = D[i], j = i * 4;
+      if (d.t === 'b') {
+        U0.set([0, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.ax, d.ay], j);
+      } else if (d.t === 'p') {
+        U0.set([1, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.vx, d.vy], j);
+      } else if (d.t === 'L') {
+        U0.set([2, d.c.x, d.c.y, d.ang], j); U1.set([d.halfW, d.taper || 2, 0, 0], j); U2.set([d.hu, d.hl, d.eu, d.el], j);
+      } else if (d.t === 'S') {
+        U0.set([3, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
+        U2.set([Math.log2(Math.max(1, 0.05 * W)), 0, 0, 0], j);
+      }
+    }
+    return n;
+  }
+
+  function frame() {
+    if (!running) return;
+    raf = requestAnimationFrame(frame);
+    if (video.readyState < 2 || !video.videoWidth) return;
+    const w = video.videoWidth, h = video.videoHeight;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+
+    let n = 0;
+    if (landmarker && !bypass) {
+      const ts = performance.now();
+      if (ts > lastTs) {
+        lastTs = ts;
+        let L = null;
+        try { L = Face.detectVideo(landmarker, video, ts); } catch { /* skip frame */ }
+        if (L) { missed = 0; L = smoothLandmarks(L); } else { missed++; if (missed > 5) smooth = null; }
+        if (onStatus) onStatus(L ? 'ok' : missed > 5 ? 'noface' : 'ok');
+        if (smooth) {
+          const items = getItems();
+          if (items.length) {
+            const W = Math.hypot(smooth[234].x - smooth[454].x, smooth[234].y - smooth[454].y);
+            n = pack(Warp.deforms(items, smooth), W);
+          }
+        }
+      }
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texObj);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.uniform2f(loc.size, w, h);
+    gl.uniform1i(loc.n, n);
+    gl.uniform4fv(loc.d0, U0); gl.uniform4fv(loc.d1, U1); gl.uniform4fv(loc.d2, U2);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  async function start(opts) {
+    ({ video, canvas, getItems, onStatus } = opts);
+    if (!gl) initGL();
+    running = true; smooth = null; lastTs = -1; missed = 0; bypass = false;
+    raf = requestAnimationFrame(frame);
+    if (onStatus) onStatus('loading');
+    landmarker = await Face.loadVideo();
+    if (onStatus) onStatus('ok');
+  }
+
+  function stop() {
+    running = false;
+    cancelAnimationFrame(raf);
+  }
+
+  // Raw (untreated) current frame as a canvas, mirrored like the preview.
+  function captureFrame() {
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    const x = c.getContext('2d');
+    x.translate(c.width, 0); x.scale(-1, 1);
+    x.drawImage(video, 0, 0);
+    return c;
+  }
+
+  window.Live = { supported, start, stop, setBypass: v => { bypass = v; }, captureFrame };
+})();

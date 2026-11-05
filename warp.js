@@ -287,5 +287,8 @@
     return out;
   }
 
-  window.Warp = { isShape: id => SHAPE.has(id), apply };
+  // All deformations for a plan (used by the live WebGL renderer).
+  const build = (items, L) => items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
+
+  window.Warp = { isShape: id => SHAPE.has(id), apply, deforms: build };
 })();
