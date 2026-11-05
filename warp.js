@@ -37,11 +37,17 @@
     const { W, ang, off, vec } = frame(L);
     const P = i => L[i];
     const out = [];
-    const bulge = (c, rx, ry, ax, ay) => out.push({ t: 'b', c, rx, ry, ax: ax * f, ay: ay * f, ang });
-    const push = (c, rx, ry, dx, dy) => { const v = vec(dx * f, dy * f); out.push({ t: 'p', c, rx, ry, vx: v.x, vy: v.y, ang }); };
+    // Head turn: how visible each side of the face is (1 = frontal, smaller = turned away).
+    // Measured from the nose tip to each face edge. Effects on a side are narrowed and
+    // weakened by its visibility, so a turned face isn't pushed past its outline.
+    const dR = dist(P(1), P(234)), dL = dist(P(1), P(454));
+    const VIS = { '-1': Math.min(1, Math.max(0.2, (2 * dR) / (dR + dL))), '1': Math.min(1, Math.max(0.2, (2 * dL) / (dR + dL))) };
+    let sv = 1;                                         // visibility of the side being built (1 outside sides())
+    const bulge = (c, rx, ry, ax, ay) => out.push({ t: 'b', c, rx: rx * sv, ry, ax: ax * f * sv, ay: ay * f * sv, ang });
+    const push = (c, rx, ry, dx, dy) => { const v = vec(dx * f * sv * sv, dy * f * sv); out.push({ t: 'p', c, rx: rx * sv, ry, vx: v.x, vy: v.y, ang }); };
     // side = -1 → person's right (image left), +1 → person's left
-    const sides = fn => { fn(-1, { apple: mid(P(50), P(205)), contourLow: mid(P(93), P(132)), cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
-                          fn(+1, { apple: mid(P(280), P(425)), contourLow: mid(P(323), P(361)), cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
+    const sides = fn => { const run = (sx, pts) => { sv = VIS[sx]; fn(sx, pts); sv = 1; }; run(-1, { apple: mid(P(50), P(205)), contourLow: mid(P(93), P(132)), cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
+                          run(+1, { apple: mid(P(280), P(425)), contourLow: mid(P(323), P(361)), cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
 
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
@@ -76,8 +82,11 @@
           push(off(p.apple, 0.02 * sx, 0.03), 0.18 * W, 0.17 * W, 0.008 * sx, -0.032);
           push(p.contourLow, 0.09 * W, 0.11 * W, 0.018 * sx, -0.008);
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
-          out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.01 * sx, -0.03), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.7 * f, W });
-          out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0, -0.01), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.45 * f, W });
+          if (sv > 0.72) {     // skip on a strongly turned-away side (lighting there is unreliable)
+            const k = sv * sv * sv;
+            out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.02 * sx * sv, -0.03), rx: 0.12 * W * sv, ry: 0.11 * W, ang, amt: 0.7 * f * k, W, vis: sv });
+            out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0.035 * sx * sv, -0.01), rx: 0.10 * W * sv, ry: 0.1 * W, ang, amt: 0.45 * f * k, W, vis: sv });   // kept off the nose shadow
+          }
         });
         break;
       case 'chin':
@@ -200,7 +209,7 @@
     const groups = {};
     list.forEach(d => (groups[d.grp || Math.random()] ||= []).push(d));
     for (const g of Object.values(groups)) {
-      if (g.length > 1) {
+      if (g.length > 1 && Math.min(...g.map(d => d.vis ?? 1)) > 0.9) {   // only balance a near-frontal face
         const lifts = g.map(d => shadowFill(ctx, w, h, d, true));
         const target = Math.max(...lifts);
         g.forEach((d, i) => { if (lifts[i] > 0.0005) d.amt *= Math.min(2.5, target / lifts[i]); });
