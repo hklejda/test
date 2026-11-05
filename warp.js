@@ -72,9 +72,12 @@
         // Volume on the cheek apples (nose level, below the cheekbone) with a gentle lift.
         // Nothing near the ears/eyes, no widening of the face.
         sides((sx, p) => {
-          bulge(p.apple, 0.14 * W, 0.13 * W, 0.20, 0.20);
-          push(off(p.apple, 0.02 * sx, 0.03), 0.16 * W, 0.15 * W, 0.006 * sx, -0.02);
-          push(p.contourLow, 0.08 * W, 0.10 * W, 0.010 * sx, -0.006);
+          bulge(p.apple, 0.15 * W, 0.14 * W, 0.26, 0.26);
+          push(off(p.apple, 0.02 * sx, 0.03), 0.17 * W, 0.16 * W, 0.006 * sx, -0.025);
+          push(p.contourLow, 0.08 * W, 0.10 * W, 0.012 * sx, -0.006);
+          // Shadow fill: hollows under the cheekbone and around the apple get filled in.
+          out.push({ t: 'S', c: off(mid(p.apple, p.angle), 0.01 * sx, -0.03), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.7 * f, W });
+          out.push({ t: 'S', c: off(p.apple, 0, -0.01), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.45 * f, W });
         });
         break;
       case 'chin':
@@ -129,6 +132,63 @@
     return out;
   }
 
+  // Shadow fill: inside an ellipse, lift the LOW-FREQUENCY shading (hollows) toward the
+  // brightness of the lit cheek around it. Texture and colour are kept (multiplicative
+  // gain on a blurred luminance), and nothing is ever brightened above the reference
+  // level — so it reads as "filled", never as highlighter.
+  function shadowFill(ctx, w, h, d) {
+    const R = Math.max(d.rx, d.ry) * 1.6;
+    const x0 = Math.max(0, Math.floor(d.c.x - R)), y0 = Math.max(0, Math.floor(d.c.y - R));
+    const x1 = Math.min(w, Math.ceil(d.c.x + R)), y1 = Math.min(h, Math.ceil(d.c.y + R));
+    const bw = x1 - x0, bh = y1 - y0;
+    if (bw < 8 || bh < 8) return;
+    const img = ctx.getImageData(x0, y0, bw, bh), P = img.data;
+    const cos = Math.cos(d.ang), sin = Math.sin(d.ang);
+    const ell = (x, y, k) => {
+      const rx = x + x0 - d.c.x, ry = y + y0 - d.c.y;
+      const lx = rx * cos + ry * sin, ly = -rx * sin + ry * cos;
+      return (lx / (d.rx * k)) ** 2 + (ly / (d.ry * k)) ** 2;
+    };
+    // luminance + box blur (separable, 2 passes ≈ gaussian)
+    const Y = new Float32Array(bw * bh);
+    for (let i = 0; i < bw * bh; i++) Y[i] = 0.299 * P[i * 4] + 0.587 * P[i * 4 + 1] + 0.114 * P[i * 4 + 2];
+    const r = Math.max(2, Math.round(d.W * 0.03));
+    const blur = (src) => {
+      const tmp = new Float32Array(bw * bh), out = new Float32Array(bw * bh);
+      for (let y = 0; y < bh; y++) { let acc = 0, n = 0;
+        for (let x = -r; x < bw + r; x++) {
+          if (x + r < bw) { acc += src[y * bw + x + r]; n++; }
+          if (x - r - 1 >= 0) { acc -= src[y * bw + x - r - 1]; n--; }
+          if (x >= 0 && x < bw) tmp[y * bw + x] = acc / n;
+        } }
+      for (let x = 0; x < bw; x++) { let acc = 0, n = 0;
+        for (let y = -r; y < bh + r; y++) {
+          if (y + r < bh) { acc += tmp[(y + r) * bw + x]; n++; }
+          if (y - r - 1 >= 0) { acc -= tmp[(y - r - 1) * bw + x]; n--; }
+          if (y >= 0 && y < bh) out[y * bw + x] = acc / n;
+        } }
+      return out;
+    };
+    const S = blur(blur(Y));
+    // reference = bright (lit) cheek level around the area: 75th percentile within 1.5× ellipse
+    const vals = [];
+    for (let y = 0; y < bh; y += 2) for (let x = 0; x < bw; x += 2) if (ell(x, y, 1.5) < 1) vals.push(S[y * bw + x]);
+    if (vals.length < 20) return;
+    vals.sort((a, b) => a - b);
+    const ref = vals[Math.floor(vals.length * 0.75)];
+    const maxGain = 1 + 0.3 * d.amt;
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const s2 = ell(x, y, 1);
+      if (s2 >= 1) continue;
+      const i = y * bw + x, sh = S[i];
+      if (sh >= ref || sh < 1) continue;
+      const wgt = (1 - s2) * (1 - s2);
+      const g = Math.min(maxGain, 1 + d.amt * wgt * (ref - sh) / sh);
+      P[i * 4] = Math.min(255, P[i * 4] * g); P[i * 4 + 1] = Math.min(255, P[i * 4 + 1] * g); P[i * 4 + 2] = Math.min(255, P[i * 4 + 2] * g);
+    }
+    ctx.putImageData(img, x0, y0);
+  }
+
   // Backward-mapped warp with bilinear sampling. src: image/canvas. items: [[id, f]].
   function apply(src, L, items) {
     const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
@@ -137,8 +197,9 @@
     const ctx = out.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(src, 0, 0, w, h);
 
-    const D = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
-    if (!D.length) return out;
+    const ALL = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
+    const D = ALL.filter(d => d.t !== 'S'), SHADE = ALL.filter(d => d.t === 'S');
+    if (!D.length) { SHADE.forEach(d => shadowFill(ctx, w, h, d)); return out; }
 
     // Only process the region the deformations touch.
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
@@ -202,6 +263,7 @@
       }
     }
     ctx.putImageData(img, 0, 0);
+    SHADE.forEach(d => shadowFill(ctx, w, h, d));
     return out;
   }
 
