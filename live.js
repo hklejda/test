@@ -111,11 +111,15 @@ void main() {
     if (a.x < 4.5) {
       // frequency separation: reduce the wrinkle-sized band, keep fine texture and base
       float Yv = lum(col);
-      float Ys = lum(textureLod(tex, tuv, c.x).rgb), Yb = lum(textureLod(tex, tuv, c.y).rgb);
+      float Ys = lum(textureLod(tex, tuv, c.x).rgb);
+      float Yb = 0.0;                                   // wide blur: 5×5 taps over ±rb, pre-smoothed by mip
+      for (int yy = -2; yy <= 2; yy++) for (int xx = -2; xx <= 2; xx++)
+        Yb += lum(textureLod(tex, clamp(q + vec2(float(xx), float(yy)) * c.y * 0.5, vec2(0.5), size - 0.5) / size, c.z).rgb);
+      Yb /= 25.0;
       if (Yv < 0.008 || Yb < 0.008) continue;
       float band = Ys - Yb, rel = abs(band) / Yb;
-      float k = clamp((0.38 - rel) / 0.16, 0.0, 1.0);
-      float w = (1.0 - s2) * (1.0 - s2);
+      float k = clamp((0.48 - rel) / 0.18, 0.0, 1.0);
+      float w = min(1.0, (1.0 - s2) * (1.0 - s2) * 1.6);
       col = min(col * max(0.6, (Yv - b.z * w * k * band) / Yv), vec3(1.0));
     } else {
       float t = clamp((1.0 - sqrt(s2)) / 0.45, 0.0, 1.0), w = t * t * (3.0 - 2.0 * t);
@@ -135,6 +139,7 @@ void main() {
     try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
   })();
 
+  let overlay = null, octx = null, scratch = null, sctx = null, lastW = [];
   let gl = null, prog = null, texObj = null, loc = {}, raf = 0, running = false;
   let video = null, canvas = null, getItems = null, onStatus = null, landmarker = null;
   let smooth = null, lastTs = -1, bypass = false, missed = 0;
@@ -186,7 +191,8 @@ void main() {
     return smooth;
   }
 
-  function pack(D, W) {
+  function pack(D0, W) {
+    const D = D0.filter(d => d.t !== 'W');
     const n = Math.min(MAXD, D.length);
     U0.fill(0); U1.fill(0); U2.fill(0);
     for (let i = 0; i < n; i++) {
@@ -201,14 +207,44 @@ void main() {
         U0.set([3, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
         U2.set([Math.log2(Math.max(1, 0.05 * W)), 0, 0, 0], j);
       } else if (d.t === 'W') {
+        continue;   // wrinkle smoothing runs on the CPU (same code as photos) — see cpuPost()
         U0.set([4, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
-        U2.set([Math.log2(Math.max(1, 0.008 * W)), Math.log2(Math.max(1, 0.05 * W)), 0, 0], j);
+        const rb = 0.032 * W;   // same scales as the photo version (warp.js)
+        U2.set([Math.log2(Math.max(1, 0.006 * W)), rb, Math.log2(Math.max(1, rb / 2.5)), 0], j);
       } else if (d.t === 'G') {
         U0.set([5, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
         U2.set([Math.log2(Math.max(1, 0.016 * W)), 0, 0, 0], j);
       }
     }
     return n;
+  }
+
+  // Wrinkle smoothing: read back just those areas, run the photo pipeline's filter, draw on an overlay.
+  function cpuPost(W, w, h) {
+    if (!overlay) return;
+    if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; scratch.width = w; scratch.height = h; }
+    octx.clearRect(0, 0, w, h);
+    for (const d of lastW) {
+      let x0, y0, x1, y1;
+      if (d.poly) {
+        const m = 0.06 * d.W, xs = d.poly.map(q => q.x), ys = d.poly.map(q => q.y);
+        x0 = Math.max(0, Math.floor(Math.min(...xs) - m)); y0 = Math.max(0, Math.floor(Math.min(...ys) - m));
+        x1 = Math.min(w, Math.ceil(Math.max(...xs) + m)); y1 = Math.min(h, Math.ceil(Math.max(...ys) + m));
+      } else {
+        const R = Math.max(d.rx, d.ry) * 1.15;
+        x0 = Math.max(0, Math.floor(d.c.x - R)); y0 = Math.max(0, Math.floor(d.c.y - R));
+        x1 = Math.min(w, Math.ceil(d.c.x + R)); y1 = Math.min(h, Math.ceil(d.c.y + R));
+      }
+      const bw = x1 - x0, bh = y1 - y0;
+      if (bw < 4 || bh < 4) continue;
+      const buf = new Uint8Array(bw * bh * 4);
+      gl.readPixels(x0, h - y1, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);   // GL rows are bottom-up
+      const img = sctx.createImageData(bw, bh);
+      for (let y = 0; y < bh; y++) img.data.set(buf.subarray((bh - 1 - y) * bw * 4, (bh - y) * bw * 4), y * bw * 4);
+      sctx.putImageData(img, x0, y0);
+      Warp.wrinkleSmooth(sctx, w, h, d);
+      octx.drawImage(scratch, x0, y0, bw, bh, x0, y0, bw, bh);
+    }
   }
 
   function frame() {
@@ -227,11 +263,14 @@ void main() {
         try { L = Face.detectVideo(landmarker, video, ts); } catch { /* skip frame */ }
         if (L) { missed = 0; L = smoothLandmarks(L); } else { missed++; if (missed > 5) smooth = null; }
         if (onStatus) onStatus(L ? 'ok' : missed > 5 ? 'noface' : 'ok');
+        lastW = [];
         if (smooth) {
           const items = getItems();
           if (items.length) {
             const W = Math.hypot(smooth[234].x - smooth[454].x, smooth[234].y - smooth[454].y);
-            n = pack(Warp.deforms(items, smooth), W);
+            const all = Warp.deforms(items, smooth);
+            lastW = all.filter(d => d.t === 'W');
+            n = pack(all, W);
           }
         }
       }
@@ -244,10 +283,14 @@ void main() {
     gl.uniform1i(loc.n, n);
     gl.uniform4fv(loc.d0, U0); gl.uniform4fv(loc.d1, U1); gl.uniform4fv(loc.d2, U2);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (bypass) lastW = [];
+    cpuPost(0, w, h);
   }
 
   async function start(opts) {
     ({ video, canvas, getItems, onStatus } = opts);
+    overlay = opts.overlay || null;
+    if (overlay) { octx = overlay.getContext('2d'); scratch = document.createElement('canvas'); sctx = scratch.getContext('2d', { willReadFrequently: true }); }
     if (!gl) initGL();
     running = true; smooth = null; lastTs = -1; missed = 0; bypass = false;
     raf = requestAnimationFrame(frame);
@@ -259,6 +302,7 @@ void main() {
   function stop() {
     running = false;
     cancelAnimationFrame(raf);
+    if (octx) octx.clearRect(0, 0, overlay.width, overlay.height);
   }
 
   // Raw (untreated) current frame as a canvas, mirrored like the preview.
@@ -271,5 +315,15 @@ void main() {
     return c;
   }
 
-  window.Live = { supported, start, stop, setBypass: v => { bypass = v; }, captureFrame };
+  // What the client currently sees (treated), as a canvas — used for debugging/tests.
+  function renderedFrame() {
+    const c = document.createElement('canvas');
+    c.width = canvas.width; c.height = canvas.height;
+    const x = c.getContext('2d');
+    x.drawImage(canvas, 0, 0);
+    if (overlay) x.drawImage(overlay, 0, 0);
+    return c;
+  }
+
+  window.Live = { supported, start, stop, setBypass: v => { bypass = v; }, captureFrame, renderedFrame };
 })();

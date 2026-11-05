@@ -643,7 +643,7 @@ $('saveSettings').addEventListener('click', () => {
 });
 
 /* ================= Live preview ================= */
-const LIVE_UI = ['liveCanvas', 'liveBadge', 'liveCaptureBtn', 'liveHoldBtn', 'liveExitBtn', 'liveNote'];
+const LIVE_UI = ['liveCanvas', 'liveOverlay', 'liveBadge', 'liveCaptureBtn', 'liveHoldBtn', 'liveExitBtn', 'liveNote'];
 
 function liveStatus(kind) {
   const el = $('liveStatus');
@@ -681,7 +681,7 @@ async function startLive() {
   state.area = 'All'; renderBuilder(); renderPlan();
   try {
     await Live.start({
-      video: v, canvas: $('liveCanvas'),
+      video: v, canvas: $('liveCanvas'), overlay: $('liveOverlay'),
       getItems: () => shapeItems().map(([id, val]) => [id, strength(byId[id], val)]),
       onStatus: liveStatus,
     });

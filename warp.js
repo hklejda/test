@@ -53,7 +53,7 @@
     const sides = fn => { const run = (sx, pts) => { sv = VIS[sx]; fn(sx, pts); sv = 1; }; run(-1, { apple: mid(P(50), P(205)), contourLow: mid(P(93), P(132)), cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
                           run(+1, { apple: mid(P(280), P(425)), contourLow: mid(P(323), P(361)), cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
 
-    const smoothArea = (c, rx, ry, amt) => out.push({ t: 'W', c, rx: rx * sv, ry, ang, amt: Math.min(0.95, amt * f * sv), W });
+    const smoothArea = (c, rx, ry, amt) => out.push({ t: 'W', c, rx: rx * sv, ry, ang, amt: Math.min(0.9, 1.9 * amt * f * sv), W });   // normal dose ≈ lines gone (a hint kept = natural)
 
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
@@ -96,7 +96,13 @@
         });
         break;
       // ---- Wrinkle smoothing (no AI): lift thin dark creases toward the surrounding skin ----
-      case 'forehead':  smoothArea(off(P(151), 0, -0.045), 0.36 * W, 0.15 * W, 0.9); break;
+      case 'forehead': {
+        // exact forehead: just above the brows up past the hairline landmarks, temple to temple
+        const bottom = [70, 63, 105, 66, 107, 336, 296, 334, 293, 300].map(i => off(P(i), 0, -0.025));
+        const top = [284, 332, 297, 338, 10, 109, 67, 103, 54].map(i => off(P(i), 0, -0.1));
+        out.push({ t: 'W', poly: [...bottom, ...top], c: off(P(151), 0, -0.06), rx: 0.4 * W, ry: 0.2 * W, ang, amt: Math.min(0.9, 1.9 * 0.9 * f), W });
+        break;
+      }
       case 'glabella':  smoothArea(off(P(9), 0, -0.005), 0.085 * W, 0.085 * W, 0.9); break;
       case 'crowsFeet': sides(sx => smoothArea(off(P(sx < 0 ? 33 : 263), 0.075 * sx, 0.01), 0.065 * W, 0.075 * W, 0.85)); break;
       case 'bunny':     sides(sx => smoothArea(off(P(6), 0.045 * sx, 0.03), 0.045 * W, 0.055 * W, 0.9)); break;
@@ -249,9 +255,16 @@
   }
 
   function region(ctx, w, h, d, pad = 1.05) {
-    const R = Math.max(d.rx, d.ry) * pad;
-    const x0 = Math.max(0, Math.floor(d.c.x - R)), y0 = Math.max(0, Math.floor(d.c.y - R));
-    const x1 = Math.min(w, Math.ceil(d.c.x + R)), y1 = Math.min(h, Math.ceil(d.c.y + R));
+    let x0, y0, x1, y1;
+    if (d.poly) {
+      const m = 0.06 * d.W, xs = d.poly.map(q => q.x), ys = d.poly.map(q => q.y);
+      x0 = Math.max(0, Math.floor(Math.min(...xs) - m)); y0 = Math.max(0, Math.floor(Math.min(...ys) - m));
+      x1 = Math.min(w, Math.ceil(Math.max(...xs) + m)); y1 = Math.min(h, Math.ceil(Math.max(...ys) + m));
+    } else {
+      const R = Math.max(d.rx, d.ry) * pad;
+      x0 = Math.max(0, Math.floor(d.c.x - R)); y0 = Math.max(0, Math.floor(d.c.y - R));
+      x1 = Math.min(w, Math.ceil(d.c.x + R)); y1 = Math.min(h, Math.ceil(d.c.y + R));
+    }
     const bw = x1 - x0, bh = y1 - y0;
     if (bw < 4 || bh < 4) return null;
     const img = ctx.getImageData(x0, y0, bw, bh);
@@ -261,7 +274,20 @@
       const lx = rx * cos + ry * sin, ly = -rx * sin + ry * cos;
       return (lx / d.rx) ** 2 + (ly / d.ry) ** 2;
     };
-    return { x0, y0, bw, bh, img, P: img.data, s2 };
+    // Polygon areas: soft (feathered) mask instead of an ellipse → even strength, soft edges.
+    let wmap = null;
+    if (d.poly) {
+      const m = document.createElement('canvas'); m.width = bw; m.height = bh;
+      const mc = m.getContext('2d');
+      const feather = Math.max(2, 0.025 * d.W);
+      mc.filter = `blur(${feather}px)`;
+      mc.fillStyle = '#fff';
+      mc.beginPath(); d.poly.forEach((q, i) => (i ? mc.lineTo(q.x - x0, q.y - y0) : mc.moveTo(q.x - x0, q.y - y0))); mc.closePath(); mc.fill();
+      const md = mc.getImageData(0, 0, bw, bh).data;
+      wmap = new Float32Array(bw * bh);
+      for (let i = 0; i < bw * bh; i++) wmap[i] = md[i * 4 + 3] / 255;
+    }
+    return { x0, y0, bw, bh, img, P: img.data, s2, wmap };
   }
 
   // Wrinkle smoothing (frequency separation): split luminance into
@@ -273,17 +299,19 @@
     const R = region(ctx, w, h, d, 1.15); if (!R) return;
     const { bw, bh, P } = R, n = bw * bh, Y = new Float32Array(n);
     for (let i = 0; i < n; i++) Y[i] = 0.299 * P[i * 4] + 0.587 * P[i * 4 + 1] + 0.114 * P[i * 4 + 2];
-    const rs = Math.max(1, Math.round(0.004 * d.W)), rb = Math.max(2, Math.round(0.022 * d.W));
+    const rs = Math.max(1, Math.round(0.0045 * d.W)), rb = Math.max(2, Math.round(0.045 * d.W));   // keep pores/texture, catch wide deep lines
     const Ys = boxBlur(Y, bw, bh, rs), Yb = boxBlur(boxBlur(Y, bw, bh, rb), bw, bh, rb);
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
-      const s2 = R.s2(x, y); if (s2 >= 1) continue;
-      const i = y * bw + x, yy = Y[i];
+      const i = y * bw + x;
+      let wf;
+      if (R.wmap) { wf = R.wmap[i]; if (wf < 0.01) continue; }
+      else { const s2 = R.s2(x, y); if (s2 >= 1) continue; wf = Math.min(1, (1 - s2) * (1 - s2) * 2.4); }
+      const yy = Y[i];
       if (yy < 2 || Yb[i] < 2) continue;
       const band = Ys[i] - Yb[i], rel = Math.abs(band) / Yb[i];
-      const k = Math.min(1, Math.max(0, (0.38 - rel) / 0.16));
+      const k = Math.min(1, Math.max(0, (0.48 - rel) / 0.18));
       if (!k) continue;
-      const wgt = (1 - s2) * (1 - s2);
-      const g = Math.max(0.6, (yy - d.amt * wgt * k * band) / yy);
+      const g = Math.max(0.6, (yy - d.amt * wf * k * band) / yy);
       P[i * 4] = Math.min(255, P[i * 4] * g); P[i * 4 + 1] = Math.min(255, P[i * 4 + 1] * g); P[i * 4 + 2] = Math.min(255, P[i * 4 + 2] * g);
     }
     ctx.putImageData(R.img, R.x0, R.y0);
@@ -417,5 +445,5 @@
   // All deformations for a plan (used by the live WebGL renderer).
   const build = (items, L) => items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
 
-  window.Warp = { isShape: id => SHAPE.has(id), isFilter: id => FILTER.has(id), apply, deforms: build };
+  window.Warp = { isShape: id => SHAPE.has(id), isFilter: id => FILTER.has(id), apply, deforms: build, wrinkleSmooth };
 })();

@@ -272,10 +272,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
 /* ---------- Live preview ---------- */
 .live-btn { color: var(--accent); border-color: var(--accent); font-weight: 600; }
-#liveCanvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0d0a0b; transform: scaleX(-1); }
+#liveCanvas, #liveOverlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0d0a0b; transform: scaleX(-1); }
 .live-badge { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,.6); color: #fff; font-size: .72rem; font-weight: 600; letter-spacing: .08em; padding: 4px 10px; border-radius: 999px; display: flex; align-items: center; gap: 6px; z-index: 2; }
 .live-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d5e; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 .live-status { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.6); color: #fff; font-size: .8rem; padding: 5px 12px; border-radius: 999px; z-index: 2; white-space: nowrap; }
 #liveHoldBtn { user-select: none; -webkit-user-select: none; touch-action: none; }
 #liveHoldBtn.on { background: var(--ink); color: var(--panel); }
+
+#liveOverlay { background: transparent; pointer-events: none; }
