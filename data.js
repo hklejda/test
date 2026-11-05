@@ -91,9 +91,6 @@ const TREATMENTS = [
   { id: 'brighten', cat: 'skin', name: 'Face brightening (filter)', area: 'Full face', type: 'level', def: 2,
     desc: 'Brighter, softer, glowing face — like a beauty filter',
     prompt: () => '' },
-  { id: 'tightening', cat: 'skin', name: 'Skin tightening (HIFU/RF)', area: 'Full face', type: 'level', def: 2,
-    desc: 'Firmer, lifted skin',
-    prompt: k => `LIFT & TIGHTEN — lift and tighten sagging skin by about ${k(45, 65)}%: firmer cheeks, smaller jowls, a sharper jawline and less looseness under the chin.` },
 
   // ---------- Contouring ----------
   { id: 'doubleChin', cat: 'contour', name: 'Double chin reduction', area: 'Neck', type: 'level', def: 2,
