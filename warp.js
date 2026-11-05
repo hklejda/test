@@ -10,11 +10,15 @@
 // Exposes window.Warp = { isShape, apply }.
 
 (function () {
+  // Treatments done here WITHOUT AI (reshaping + local filters). Everything else goes to the AI.
   const SHAPE = new Set([
     'lips', 'cheeks', 'chin', 'jawline',
     'browLift', 'lipFlip', 'gummy', 'masseter',
-    'doubleChin', 'buccal', 'jowls', 'threads', 'tightening',
+    'forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis',    // wrinkle smoothing filter
+    'doubleChin', 'buccal', 'threads', 'tightening',
+    'brighten',                                                   // beauty filter
   ]);
+  const FILTER = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis', 'brighten']);
 
   const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -48,6 +52,8 @@
     // side = -1 → person's right (image left), +1 → person's left
     const sides = fn => { const run = (sx, pts) => { sv = VIS[sx]; fn(sx, pts); sv = 1; }; run(-1, { apple: mid(P(50), P(205)), contourLow: mid(P(93), P(132)), cheek: mid(P(50), P(117)), zyg: mid(P(234), P(93)), angle: P(172), jowl: P(136), lowCheek: mid(P(132), P(58)), brow: mid(P(46), P(70)), temple: P(21) });
                           run(+1, { apple: mid(P(280), P(425)), contourLow: mid(P(323), P(361)), cheek: mid(P(280), P(346)), zyg: mid(P(454), P(323)), angle: P(397), jowl: P(365), lowCheek: mid(P(361), P(288)), brow: mid(P(276), P(300)), temple: P(251) }); };
+
+    const smoothArea = (c, rx, ry, amt) => out.push({ t: 'W', c, rx: rx * sv, ry, ang, amt: Math.min(0.95, amt * f * sv), W });
 
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
@@ -89,6 +95,15 @@
           }
         });
         break;
+      // ---- Wrinkle smoothing (no AI): lift thin dark creases toward the surrounding skin ----
+      case 'forehead':  smoothArea(off(P(151), 0, -0.045), 0.36 * W, 0.15 * W, 0.9); break;
+      case 'glabella':  smoothArea(off(P(9), 0, -0.005), 0.085 * W, 0.085 * W, 0.9); break;
+      case 'crowsFeet': sides(sx => smoothArea(off(P(sx < 0 ? 33 : 263), 0.075 * sx, 0.01), 0.065 * W, 0.075 * W, 0.85)); break;
+      case 'bunny':     sides(sx => smoothArea(off(P(6), 0.045 * sx, 0.03), 0.045 * W, 0.055 * W, 0.9)); break;
+      case 'mentalis':  smoothArea(off(P(152), 0, -0.06), 0.13 * W, 0.09 * W, 0.85); break;
+      // ---- Beauty filter: brighter, softer, slightly warm face ----
+      case 'brighten':  out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.2, 0.9 * f), W }); break;
+
       case 'chin':
         push(off(P(152), 0, -0.04), 0.17 * W, 0.14 * W, 0, 0.035);
         bulge(off(P(152), 0, -0.05), 0.11 * W, 0.09 * W, 0.08, 0.08);
@@ -215,6 +230,95 @@
     return cnt ? lift / cnt : 0;
   }
 
+  // Separable box blur of a Float32 channel (radius r).
+  function boxBlur(src, bw, bh, r) {
+    const tmp = new Float32Array(bw * bh), out = new Float32Array(bw * bh);
+    for (let y = 0; y < bh; y++) { let acc = 0, n = 0;
+      for (let x = -r; x < bw + r; x++) {
+        if (x + r < bw) { acc += src[y * bw + x + r]; n++; }
+        if (x - r - 1 >= 0) { acc -= src[y * bw + x - r - 1]; n--; }
+        if (x >= 0 && x < bw) tmp[y * bw + x] = acc / n;
+      } }
+    for (let x = 0; x < bw; x++) { let acc = 0, n = 0;
+      for (let y = -r; y < bh + r; y++) {
+        if (y + r < bh) { acc += tmp[(y + r) * bw + x]; n++; }
+        if (y - r - 1 >= 0) { acc -= tmp[(y - r - 1) * bw + x]; n--; }
+        if (y >= 0 && y < bh) out[y * bw + x] = acc / n;
+      } }
+    return out;
+  }
+
+  function region(ctx, w, h, d, pad = 1.05) {
+    const R = Math.max(d.rx, d.ry) * pad;
+    const x0 = Math.max(0, Math.floor(d.c.x - R)), y0 = Math.max(0, Math.floor(d.c.y - R));
+    const x1 = Math.min(w, Math.ceil(d.c.x + R)), y1 = Math.min(h, Math.ceil(d.c.y + R));
+    const bw = x1 - x0, bh = y1 - y0;
+    if (bw < 4 || bh < 4) return null;
+    const img = ctx.getImageData(x0, y0, bw, bh);
+    const cos = Math.cos(d.ang), sin = Math.sin(d.ang);
+    const s2 = (x, y) => {
+      const rx = x + x0 - d.c.x, ry = y + y0 - d.c.y;
+      const lx = rx * cos + ry * sin, ly = -rx * sin + ry * cos;
+      return (lx / d.rx) ** 2 + (ly / d.ry) ** 2;
+    };
+    return { x0, y0, bw, bh, img, P: img.data, s2 };
+  }
+
+  // Wrinkle smoothing (frequency separation): split luminance into
+  //   fine  = Y − blur_small   (pores, skin texture)       → kept
+  //   band  = blur_small − blur_big (wrinkle-sized shading) → reduced by the dose
+  //   base  = blur_big          (overall shape & light)     → kept
+  // Very strong band values (eyebrows, lashes, hairline, eye corners) are protected.
+  function wrinkleSmooth(ctx, w, h, d) {
+    const R = region(ctx, w, h, d, 1.15); if (!R) return;
+    const { bw, bh, P } = R, n = bw * bh, Y = new Float32Array(n);
+    for (let i = 0; i < n; i++) Y[i] = 0.299 * P[i * 4] + 0.587 * P[i * 4 + 1] + 0.114 * P[i * 4 + 2];
+    const rs = Math.max(1, Math.round(0.004 * d.W)), rb = Math.max(2, Math.round(0.022 * d.W));
+    const Ys = boxBlur(Y, bw, bh, rs), Yb = boxBlur(boxBlur(Y, bw, bh, rb), bw, bh, rb);
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const s2 = R.s2(x, y); if (s2 >= 1) continue;
+      const i = y * bw + x, yy = Y[i];
+      if (yy < 2 || Yb[i] < 2) continue;
+      const band = Ys[i] - Yb[i], rel = Math.abs(band) / Yb[i];
+      const k = Math.min(1, Math.max(0, (0.38 - rel) / 0.16));
+      if (!k) continue;
+      const wgt = (1 - s2) * (1 - s2);
+      const g = Math.max(0.6, (yy - d.amt * wgt * k * band) / yy);
+      P[i * 4] = Math.min(255, P[i * 4] * g); P[i * 4 + 1] = Math.min(255, P[i * 4 + 1] * g); P[i * 4 + 2] = Math.min(255, P[i * 4 + 2] * g);
+    }
+    ctx.putImageData(R.img, R.x0, R.y0);
+  }
+
+  // Beauty filter: brighten midtones, soften skin (edge-aware), slight warmth. Soft edges.
+  function glow(ctx, w, h, d) {
+    const R = region(ctx, w, h, d); if (!R) return;
+    const { bw, bh, P } = R, n = bw * bh;
+    const ch = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
+    const r = Math.max(1, Math.round(0.008 * d.W));
+    const B = ch.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
+    const gamma = 1 - 0.16 * d.amt, warm = 0.015 * d.amt;
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const s2 = R.s2(x, y); if (s2 >= 1) continue;
+      const t = Math.min(1, Math.max(0, (1 - Math.sqrt(s2)) / 0.45)), wgt = t * t * (3 - 2 * t);
+      const i = y * bw + x;
+      const Yv = 0.299 * ch[0][i] + 0.587 * ch[1][i] + 0.114 * ch[2][i];
+      const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i] || 1;
+      const sm = 0.45 * d.amt * Math.max(0, 1 - Math.abs(Yv - Yb) / Yb / 0.1);   // smooth skin, keep edges
+      for (let k = 0; k < 3; k++) {
+        const c = ch[k][i] / 255, cb = B[k][i] / 255;
+        let v = Math.pow(c, gamma) * (1 - sm) + Math.pow(cb, gamma) * sm;
+        v *= k === 0 ? 1 + warm : k === 2 ? 1 - warm : 1;
+        P[i * 4 + k] = Math.min(255, 255 * (c + wgt * (v - c)));
+      }
+    }
+    ctx.putImageData(R.img, R.x0, R.y0);
+  }
+
+  function postFilters(ctx, w, h, list) {
+    list.filter(d => d.t === 'W').forEach(d => wrinkleSmooth(ctx, w, h, d));
+    list.filter(d => d.t === 'G').forEach(d => glow(ctx, w, h, d));
+  }
+
   // Run shadow fills so paired areas (left/right cheek) get the SAME average fill,
   // even when the photo is lit from one side.
   function shadeBalanced(ctx, w, h, list) {
@@ -239,8 +343,9 @@
     ctx.drawImage(src, 0, 0, w, h);
 
     const ALL = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
-    const D = ALL.filter(d => d.t !== 'S'), SHADE = ALL.filter(d => d.t === 'S');
-    if (!D.length) { shadeBalanced(ctx, w, h, SHADE); return out; }
+    const D = ALL.filter(d => d.t === 'b' || d.t === 'p' || d.t === 'L'), SHADE = ALL.filter(d => d.t === 'S');
+    const POST = ALL.filter(d => d.t === 'W' || d.t === 'G');
+    if (!D.length) { shadeBalanced(ctx, w, h, SHADE); postFilters(ctx, w, h, POST); return out; }
 
     // Only process the region the deformations touch.
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
@@ -305,11 +410,12 @@
     }
     ctx.putImageData(img, 0, 0);
     shadeBalanced(ctx, w, h, SHADE);
+    postFilters(ctx, w, h, POST);
     return out;
   }
 
   // All deformations for a plan (used by the live WebGL renderer).
   const build = (items, L) => items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
 
-  window.Warp = { isShape: id => SHAPE.has(id), apply, deforms: build };
+  window.Warp = { isShape: id => SHAPE.has(id), isFilter: id => FILTER.has(id), apply, deforms: build };
 })();

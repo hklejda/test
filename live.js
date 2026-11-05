@@ -16,7 +16,7 @@ out vec2 uv;
 void main() { uv = a * 0.5 + 0.5; gl_Position = vec4(a, 0.0, 1.0); }`;
 
   // Same maths as warp.js (backward mapping), one deformation per uniform slot:
-  //   d0 = (type, cx, cy, angle)   type: 0 bulge, 1 push, 2 lip stretch, 3 shadow fill
+  //   d0 = (type, cx, cy, angle)   type: 0 bulge, 1 push, 2 lip stretch, 3 shadow fill, 4 wrinkle smooth, 5 glow
   //   d1 = bulge (rx, ry, ax, ay) | push (rx, ry, vx, vy) | lip (halfW, taper, -, -) | shade (rx, ry, amt, -)
   //   d2 = lip (hu, hl, eu, el) | shade (mipLevel, -, -, -)
   const FS = `#version 300 es
@@ -76,7 +76,7 @@ void main() {
   for (int i = 0; i < ${MAXD}; i++) {
     if (i >= n) break;
     vec4 a = d0[i], b = d1[i], c = d2[i];
-    if (a.x < 2.5) continue;
+    if (a.x < 2.5 || a.x > 3.5) continue;
     vec2 r = p - a.yz;
     float cs = cos(a.w), sn = sin(a.w);
     vec2 l = vec2(r.x * cs + r.y * sn, -r.x * sn + r.y * cs);
@@ -95,6 +95,37 @@ void main() {
       float w = (1.0 - s2) * (1.0 - s2);
       float g = min(1.0 + 0.3 * b.z, 1.0 + b.z * w * (ref - S) / S);
       col = min(col * g, vec3(1.0));
+    }
+  }
+
+  // Wrinkle smoothing (4) and glow / brightening (5).
+  for (int i = 0; i < ${MAXD}; i++) {
+    if (i >= n) break;
+    vec4 a = d0[i], b = d1[i], c = d2[i];
+    if (a.x < 3.5) continue;
+    vec2 r = p - a.yz;
+    float cs = cos(a.w), sn = sin(a.w);
+    vec2 l = vec2(r.x * cs + r.y * sn, -r.x * sn + r.y * cs);
+    vec2 qq = l / b.xy; float s2 = dot(qq, qq);
+    if (s2 >= 1.0) continue;
+    if (a.x < 4.5) {
+      // frequency separation: reduce the wrinkle-sized band, keep fine texture and base
+      float Yv = lum(col);
+      float Ys = lum(textureLod(tex, tuv, c.x).rgb), Yb = lum(textureLod(tex, tuv, c.y).rgb);
+      if (Yv < 0.008 || Yb < 0.008) continue;
+      float band = Ys - Yb, rel = abs(band) / Yb;
+      float k = clamp((0.38 - rel) / 0.16, 0.0, 1.0);
+      float w = (1.0 - s2) * (1.0 - s2);
+      col = min(col * max(0.6, (Yv - b.z * w * k * band) / Yv), vec3(1.0));
+    } else {
+      float t = clamp((1.0 - sqrt(s2)) / 0.45, 0.0, 1.0), w = t * t * (3.0 - 2.0 * t);
+      vec3 cb = textureLod(tex, tuv, c.x).rgb;
+      float Yv = lum(col), Yb = max(lum(cb), 0.004);
+      float sm = 0.45 * b.z * max(0.0, 1.0 - abs(Yv - Yb) / Yb / 0.1);
+      float gm = 1.0 - 0.16 * b.z;
+      vec3 v = mix(pow(col, vec3(gm)), pow(cb, vec3(gm)), sm);
+      v *= vec3(1.0 + 0.015 * b.z, 1.0, 1.0 - 0.015 * b.z);
+      col = min(mix(col, v, w), vec3(1.0));
     }
   }
   o = vec4(col, 1.0);
@@ -169,6 +200,12 @@ void main() {
       } else if (d.t === 'S') {
         U0.set([3, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
         U2.set([Math.log2(Math.max(1, 0.05 * W)), 0, 0, 0], j);
+      } else if (d.t === 'W') {
+        U0.set([4, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
+        U2.set([Math.log2(Math.max(1, 0.008 * W)), Math.log2(Math.max(1, 0.05 * W)), 0, 0], j);
+      } else if (d.t === 'G') {
+        U0.set([5, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
+        U2.set([Math.log2(Math.max(1, 0.016 * W)), 0, 0, 0], j);
       }
     }
     return n;

@@ -135,7 +135,7 @@
       case 'platysma':   return { add: [p([...pts(LOWER_JAW), ...below(LOWER_JAW, 0.45)]), ...jawLine] };
 
       // Skin
-      case 'booster': case 'peel': case 'microneedling': case 'laser': case 'pigment': case 'acne':
+      case 'booster': case 'peel': case 'microneedling': case 'laser': case 'pigment': case 'acne': case 'brighten':
         return { add: faceSkin, cut: skinCut };
       case 'eyeBright':  return { add: underEyes(0.12, 0.065) };
       case 'tightening': return { add: [...faceSkin, ...jawLine, p([...pts(LOWER_JAW), ...below(LOWER_JAW, 0.12)])], cut: skinCut };

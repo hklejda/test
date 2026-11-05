@@ -96,7 +96,7 @@ function renderTabs() {
   const wrap = $('catTabs');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id).length;
+    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id && (!state.live || Warp.isShape(id))).length;
     const b = document.createElement('button');
     b.className = 'cat-tab' + (c.id === state.cat ? ' on' : '');
     b.setAttribute('role', 'tab');
@@ -108,7 +108,7 @@ function renderTabs() {
 }
 
 function renderAreaFilter() {
-  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat).map(t => t.area))];
+  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat && (!state.live || Warp.isShape(t.id))).map(t => t.area))];
   const wrap = $('areaFilter');
   wrap.innerHTML = '';
   if (areas.length <= 2) return;
@@ -125,7 +125,8 @@ function renderAreaFilter() {
 function renderGrid() {
   const grid = $('treatGrid');
   grid.innerHTML = '';
-  const list = TREATMENTS.filter(t => t.cat === state.cat && (state.area === 'All' || t.area === state.area));
+  const list = TREATMENTS.filter(t => t.cat === state.cat && (state.area === 'All' || t.area === state.area)
+    && (!state.live || Warp.isShape(t.id)));                 // Live: only treatments that run without AI
   for (const t of list) grid.appendChild(card(t));
 }
 
@@ -136,7 +137,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${Warp.isShape(t.id) ? 'precise reshape' : 'AI'}</span>`;
+    <span class="t-range">${rangeText(t)} · ${Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';
@@ -185,7 +186,7 @@ function renderPlan() {
   const wrap = $('planList');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id);
+    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id && (!state.live || Warp.isShape(id)));
     if (!items.length) continue;
     const g = document.createElement('div');
     g.className = 'plan-group';
@@ -649,7 +650,7 @@ function liveStatus(kind) {
   const text = kind === 'loading' ? 'Starting face tracking…'
     : kind === 'noface' ? 'Face not found — look at the camera'
     : !state.plan.size ? 'Select treatments on the right to see them live'
-    : !shapeItems().length ? 'Selected treatments are AI-only — capture to apply them'
+    : !shapeItems().length ? 'Select a treatment on the right (AI treatments are hidden in Live)'
     : '';
   el.hidden = !text;
   if (text && el.textContent !== text) el.textContent = text;
@@ -677,6 +678,7 @@ async function startLive() {
    'viewToggle', 'downloadBtn', 'printBtn', 'resetBtn', 'faceStatus'].forEach(id => $(id).hidden = true);
   LIVE_UI.forEach(id => $(id).hidden = false);
   $('liveBtn').hidden = true;
+  state.area = 'All'; renderBuilder(); renderPlan();
   try {
     await Live.start({
       video: v, canvas: $('liveCanvas'),
@@ -698,6 +700,7 @@ function stopLive(restoreView = true) {
   $('video').srcObject = null;
   LIVE_UI.concat('liveStatus').forEach(id => $(id).hidden = true);
   $('stage').style.aspectRatio = '';
+  renderBuilder(); renderPlan();
   $('liveBtn').hidden = false;
   if (!restoreView) return;
   if (state.current >= 0) { $('compare').hidden = false; ['viewToggle', 'downloadBtn', 'printBtn'].forEach(id => $(id).hidden = false); }
