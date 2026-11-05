@@ -119,11 +119,23 @@
         push(off(P(152), 0, 0.10), 0.22 * W, 0.13 * W, 0, -0.05);
         break;
       case 'jowls': {
-        // Jawline definition: tighten the soft tissue just below the jaw edge up against it,
-        // from the jaw angle to beside the chin (the chin centre is handled by Double chin).
-        for (const i of [172, 136, 150, 176, 397, 365, 379, 400]) {
-          const sx = [172, 136, 150, 176].includes(i) ? -1 : 1;
-          push(off(P(i), 0, 0.045), 0.09 * W, 0.075 * W, -0.008 * sx, -0.028);
+        // Jawline definition: one smooth, continuous tightening along the whole jaw edge.
+        // Many small overlapping kernels follow the jaw curve (no gaps → no waves); each
+        // pulls the soft tissue just below the edge up against the jaw, along the jaw normal.
+        const J = [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397].map(P);
+        const pts = [];
+        for (let i = 0; i < J.length; i++) { pts.push(J[i]); if (i < J.length - 1) pts.push(mid(J[i], J[i + 1])); }
+        const centre = P(1), total = 0.03 * W * f, perKernel = total / 3.2;
+        for (let i = 1; i < pts.length - 1; i++) {
+          const t = { x: pts[i + 1].x - pts[i - 1].x, y: pts[i + 1].y - pts[i - 1].y };
+          const tl = Math.hypot(t.x, t.y) || 1; t.x /= tl; t.y /= tl;
+          let nx = -t.y, ny = t.x;                               // normal, pointing into the face
+          if ((centre.x - pts[i].x) * nx + (centre.y - pts[i].y) * ny < 0) { nx = -nx; ny = -ny; }
+          const side = pts[i].x < centre.x ? VIS['-1'] : VIS['1'];
+          const taper = Math.sin(Math.PI * i / (pts.length - 1));  // fade out toward the ears
+          const amt = perKernel * side * (0.45 + 0.55 * taper);
+          out.push({ t: 'p', c: { x: pts[i].x - nx * 0.03 * W, y: pts[i].y - ny * 0.03 * W },
+            rx: 0.07 * W * side, ry: 0.065 * W, ang: Math.atan2(t.y, t.x), vx: nx * amt, vy: ny * amt });
         }
         break;
       }
