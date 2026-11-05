@@ -75,7 +75,7 @@ const TREATMENTS = [
   // ---------- Skin treatments ----------
   { id: 'booster', cat: 'skin', name: 'Skin booster', area: 'Full face', type: 'level', def: 2,
     desc: 'Hydration and healthy glow',
-    prompt: k => `SKIN GLOW — make the facial skin about ${k(60, 80)}% more hydrated and radiant: dewy, plump skin with a healthy glow and softer fine lines.` },
+    prompt: k => `SKIN QUALITY (skin booster) — improve skin quality by about ${k(55, 75)}%: smoother, more even and more hydrated-looking skin, softer fine lines and smaller pores. Natural MATTE finish: no shine, no oily or glossy look, no glow effect. Keep the same skin tone and brightness.` },
   { id: 'laser', cat: 'skin', name: 'Laser resurfacing', area: 'Full face', type: 'level', def: 2,
     desc: 'Fine lines and texture',
     prompt: k => `RESURFACING — remove about ${k(75)}% of fine lines, wrinkles and rough texture on the face, so the skin looks smoother, tighter and more even.` },

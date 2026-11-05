@@ -76,7 +76,7 @@ function buildPrompt() {
     'Keep everything else exactly the same: the same person and identity, eyes, eye color, nose, mouth, hair, expression, ' +
       'head position, camera angle, framing, lighting, colors, background and clothing — except where a change above requires it.',
     hasSkin
-      ? 'Photorealistic result with real skin texture and pores (no airbrushed or plastic look), no makeup, no filters.'
+      ? 'Keep the same skin tone, brightness, color and lighting as the original — no whitening, no shine, no oily or glossy skin. Photorealistic result with real skin texture and pores (no airbrushed or plastic look), no makeup, no filters.'
       : 'Do not retouch or smooth the skin. Photorealistic result, no makeup, no filters.',
   ].join('\n');
 }

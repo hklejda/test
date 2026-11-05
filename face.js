@@ -306,6 +306,44 @@
     warpCtx.putImageData(wd, 0, 0);
   }
 
+  /* ---------------- Detail-only transfer ---------------- */
+  // For skin & wrinkle treatments we want the AI's FINE detail (smoother texture, fewer
+  // scars/spots/lines) but NOT its broad changes in brightness, colour or shine.
+  //   result = AI − blur(AI) + blur(original)   inside those areas
+  // Shine, whitening and "glow" are broad (low-frequency) and get removed; scars,
+  // spots, pores and wrinkles are fine (high-frequency) and are kept.
+  const DETAIL = new Set(['booster', 'laser', 'pigment', 'acne', 'forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis', 'platysma']);
+
+  function blurred(src, w, h, sigma) {
+    const c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    if (FILTER_OK) { x.filter = `blur(${sigma}px)`; x.drawImage(src, 0, 0, w, h); }
+    else {
+      const k = Math.max(1, sigma * 1.2), sm = canvas(Math.max(1, Math.round(w / k)), Math.max(1, Math.round(h / k)));
+      const m = sm.getContext('2d'); m.imageSmoothingQuality = 'high'; m.drawImage(src, 0, 0, sm.width, sm.height);
+      x.imageSmoothingQuality = 'high'; x.drawImage(sm, 0, 0, w, h);
+    }
+    return x.getImageData(0, 0, w, h).data;
+  }
+
+  function detailOnly(origCanvas, warpCtx, detailMask, w, h, W) {
+    const sigma = Math.max(2, 0.025 * W);
+    const BO = blurred(origCanvas, w, h, sigma), BA = blurred(warpCtx.canvas, w, h, sigma);
+    const Mk = detailMask.getContext('2d').getImageData(0, 0, w, h).data;
+    const O = origCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+    const wd = warpCtx.getImageData(0, 0, w, h), A = wd.data;
+    for (let i = 0; i < A.length; i += 4) {
+      const m = Mk[i + 3] / 255;
+      if (m < 0.01 || !A[i + 3]) continue;
+      for (let k = 0; k < 3; k++) {
+        let v = A[i + k] + (BO[i + k] - BA[i + k]);
+        // No shine: never brighter than the original pixel or its surrounding skin level.
+        v = Math.min(v, Math.max(O[i + k], BO[i + k] + 5));
+        A[i + k] = A[i + k] + m * (v - A[i + k]);
+      }
+    }
+    warpCtx.putImageData(wd, 0, 0);
+  }
+
   /* ---------------- Protect ---------------- */
   // original: canvas/img of the source photo. origL: its landmarks.
   // result: img/bitmap returned by the model. ids: selected treatment ids.
@@ -342,6 +380,13 @@
     octx.drawImage(original, 0, 0, w, h);
 
     try { seamless(out, wctx, mask, w, h); } catch (e) { console.warn('seamless blend skipped', e); }
+
+    // Skin & wrinkle areas: keep only the AI's fine detail, original brightness/tone.
+    const detailIds = ids.filter(id => DETAIL.has(id));
+    if (detailIds.length) {
+      try { detailOnly(out, wctx, buildMask(detailIds, sets, w, h), w, h, frame(origL).W); }
+      catch (e) { console.warn('detail-only skipped', e); }
+    }
 
     wctx.globalCompositeOperation = 'destination-in';
     wctx.drawImage(mask, 0, 0);
