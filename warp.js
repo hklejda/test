@@ -72,12 +72,12 @@
         // Volume on the cheek apples (nose level, below the cheekbone) with a gentle lift.
         // Nothing near the ears/eyes, no widening of the face.
         sides((sx, p) => {
-          bulge(p.apple, 0.15 * W, 0.14 * W, 0.26, 0.26);
-          push(off(p.apple, 0.02 * sx, 0.03), 0.17 * W, 0.16 * W, 0.006 * sx, -0.025);
-          push(p.contourLow, 0.08 * W, 0.10 * W, 0.012 * sx, -0.006);
+          bulge(p.apple, 0.16 * W, 0.15 * W, 0.34, 0.34);
+          push(off(p.apple, 0.02 * sx, 0.03), 0.18 * W, 0.17 * W, 0.008 * sx, -0.032);
+          push(p.contourLow, 0.09 * W, 0.11 * W, 0.018 * sx, -0.008);
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
-          out.push({ t: 'S', c: off(mid(p.apple, p.angle), 0.01 * sx, -0.03), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.7 * f, W });
-          out.push({ t: 'S', c: off(p.apple, 0, -0.01), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.45 * f, W });
+          out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.01 * sx, -0.03), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.7 * f, W });
+          out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0, -0.01), rx: 0.13 * W, ry: 0.11 * W, ang, amt: 0.45 * f, W });
         });
         break;
       case 'chin':
@@ -136,7 +136,7 @@
   // brightness of the lit cheek around it. Texture and colour are kept (multiplicative
   // gain on a blurred luminance), and nothing is ever brightened above the reference
   // level — so it reads as "filled", never as highlighter.
-  function shadowFill(ctx, w, h, d) {
+  function shadowFill(ctx, w, h, d, dry = false) {
     const R = Math.max(d.rx, d.ry) * 1.6;
     const x0 = Math.max(0, Math.floor(d.c.x - R)), y0 = Math.max(0, Math.floor(d.c.y - R));
     const x1 = Math.min(w, Math.ceil(d.c.x + R)), y1 = Math.min(h, Math.ceil(d.c.y + R));
@@ -177,16 +177,36 @@
     vals.sort((a, b) => a - b);
     const ref = vals[Math.floor(vals.length * 0.75)];
     const maxGain = 1 + 0.3 * d.amt;
+    let lift = 0, cnt = 0;
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const s2 = ell(x, y, 1);
       if (s2 >= 1) continue;
+      cnt++;
       const i = y * bw + x, sh = S[i];
       if (sh >= ref || sh < 1) continue;
       const wgt = (1 - s2) * (1 - s2);
       const g = Math.min(maxGain, 1 + d.amt * wgt * (ref - sh) / sh);
+      lift += g - 1;
+      if (dry) continue;
       P[i * 4] = Math.min(255, P[i * 4] * g); P[i * 4 + 1] = Math.min(255, P[i * 4 + 1] * g); P[i * 4 + 2] = Math.min(255, P[i * 4 + 2] * g);
     }
-    ctx.putImageData(img, x0, y0);
+    if (!dry) ctx.putImageData(img, x0, y0);
+    return cnt ? lift / cnt : 0;
+  }
+
+  // Run shadow fills so paired areas (left/right cheek) get the SAME average fill,
+  // even when the photo is lit from one side.
+  function shadeBalanced(ctx, w, h, list) {
+    const groups = {};
+    list.forEach(d => (groups[d.grp || Math.random()] ||= []).push(d));
+    for (const g of Object.values(groups)) {
+      if (g.length > 1) {
+        const lifts = g.map(d => shadowFill(ctx, w, h, d, true));
+        const target = Math.max(...lifts);
+        g.forEach((d, i) => { if (lifts[i] > 0.0005) d.amt *= Math.min(2.5, target / lifts[i]); });
+      }
+      g.forEach(d => shadowFill(ctx, w, h, d));
+    }
   }
 
   // Backward-mapped warp with bilinear sampling. src: image/canvas. items: [[id, f]].
@@ -199,7 +219,7 @@
 
     const ALL = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
     const D = ALL.filter(d => d.t !== 'S'), SHADE = ALL.filter(d => d.t === 'S');
-    if (!D.length) { SHADE.forEach(d => shadowFill(ctx, w, h, d)); return out; }
+    if (!D.length) { shadeBalanced(ctx, w, h, SHADE); return out; }
 
     // Only process the region the deformations touch.
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
@@ -263,7 +283,7 @@
       }
     }
     ctx.putImageData(img, 0, 0);
-    SHADE.forEach(d => shadowFill(ctx, w, h, d));
+    shadeBalanced(ctx, w, h, SHADE);
     return out;
   }
 
