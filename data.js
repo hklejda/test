@@ -11,7 +11,6 @@ const CATEGORIES = [
   { id: 'filler',  name: 'Dermal Fillers',  short: 'Fillers',    icon: '💧', unit: 'mL', blurb: 'Hyaluronic acid, mL per session (both sides for paired areas)' },
   { id: 'botox',   name: 'Botulinum Toxin', short: 'Botox',      icon: '✦',  unit: 'U',  blurb: 'Units of onabotulinumtoxinA (Botox®), total for the area' },
   { id: 'skin',    name: 'Skin Treatments', short: 'Skin',       icon: '✧',  unit: null, blurb: 'Skin quality, scars, pigmentation and firmness' },
-  { id: 'contour', name: 'Contouring',      short: 'Contouring', icon: '◇',  unit: null, blurb: 'Fat reduction and lifting' },
 ];
 
 const LEVELS = ['', 'Light', 'Medium', 'Intensive'];
@@ -92,16 +91,6 @@ const TREATMENTS = [
     desc: 'Brighter, softer, glowing face — like a beauty filter',
     prompt: () => '' },
 
-  // ---------- Contouring ----------
-  { id: 'doubleChin', cat: 'contour', name: 'Double chin reduction', area: 'Neck', type: 'level', def: 2,
-    desc: 'Fat dissolving under the chin',
-    prompt: k => `DOUBLE CHIN — remove about ${k(85)}% of the fat under the chin, so there is a sharp angle between the chin and the neck and a clean, defined jawline.` },
-  { id: 'buccal', cat: 'contour', name: 'Lower-cheek slimming', area: 'Cheeks', type: 'level', def: 2,
-    desc: 'Slimmer lower cheeks',
-    prompt: k => `LOWER CHEEKS — slim the lower cheeks (below the cheekbones) by about ${k(30, 45)}%, so they look slightly hollowed and the face looks more sculpted. Move the face outline inward there.` },
-  { id: 'threads', cat: 'contour', name: 'Thread lift', area: 'Full face', type: 'level', def: 2,
-    desc: 'Lift midface and jowls',
-    prompt: k => `THREAD LIFT — lift the cheeks and midface upward and outward by about ${k(40, 60)}%, with softer smile lines, smaller jowls and a sharper jawline.` },
 ];
 
 const STYLES = [

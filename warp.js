@@ -15,7 +15,6 @@
     'lips', 'cheeks', 'chin', 'jawline',
     'browLift', 'lipFlip', 'gummy', 'masseter',
     'forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis',    // wrinkle smoothing filter
-    'doubleChin', 'buccal', 'threads',
     'brighten',                                                   // beauty filter
   ]);
   const FILTER = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis', 'brighten']);
