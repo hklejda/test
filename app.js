@@ -61,7 +61,10 @@ const WRINKLE = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis
 const wrinkleViaAI = id => WRINKLE.has(id) && !!store.get('fal_key');
 const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && (!Warp.isShape(id) || wrinkleViaAI(id))));
 const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id) && !wrinkleViaAI(id));
-const liveItems = () => [...state.plan].filter(([id]) => Warp.isShape(id));
+// Live shows only treatments with a clear, real effect without AI.
+const LIVE_OK = new Set(['lips', 'cheeks', 'chin', 'jawline', 'browLift', 'lipFlip', 'masseter', 'brighten']);
+const liveOk = id => LIVE_OK.has(id);
+const liveItems = () => [...state.plan].filter(([id]) => liveOk(id));
 
 function buildPrompt() {
   const items = aiItems();
@@ -100,7 +103,7 @@ function renderTabs() {
   const wrap = $('catTabs');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id && (!state.live || Warp.isShape(id))).length;
+    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id && (!state.live || liveOk(id))).length;
     const b = document.createElement('button');
     b.className = 'cat-tab' + (c.id === state.cat ? ' on' : '');
     b.setAttribute('role', 'tab');
@@ -112,7 +115,7 @@ function renderTabs() {
 }
 
 function renderAreaFilter() {
-  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat && (!state.live || Warp.isShape(t.id))).map(t => t.area))];
+  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat && (!state.live || liveOk(t.id))).map(t => t.area))];
   const wrap = $('areaFilter');
   wrap.innerHTML = '';
   if (areas.length <= 2) return;
@@ -130,7 +133,7 @@ function renderGrid() {
   const grid = $('treatGrid');
   grid.innerHTML = '';
   const list = TREATMENTS.filter(t => t.cat === state.cat && (state.area === 'All' || t.area === state.area)
-    && (!state.live || Warp.isShape(t.id)));                 // Live: only treatments that run without AI
+    && (!state.live || liveOk(t.id)));                 // Live: only treatments that run without AI
   for (const t of list) grid.appendChild(card(t));
 }
 
@@ -141,7 +144,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? 'AI · live preview' : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
+    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? 'AI' : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';
@@ -190,7 +193,7 @@ function renderPlan() {
   const wrap = $('planList');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id && (!state.live || Warp.isShape(id)));
+    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id && (!state.live || liveOk(id)));
     if (!items.length) continue;
     const g = document.createElement('div');
     g.className = 'plan-group';
