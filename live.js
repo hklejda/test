@@ -243,6 +243,14 @@ void main() {
       for (let y = 0; y < bh; y++) img.data.set(buf.subarray((bh - 1 - y) * bw * 4, (bh - y) * bw * 4), y * bw * 4);
       sctx.putImageData(img, x0, y0);
       Warp.cpuFilter(sctx, w, h, d);
+      // Lay back ONLY the pixels the filter changed; everything else in the box stays transparent,
+      // so the box edge can never show (phones: frame lag and colour handling differ).
+      const res = sctx.getImageData(x0, y0, bw, bh), R = res.data, O = img.data;
+      for (let i = 0; i < R.length; i += 4) {
+        const d0 = Math.abs(R[i] - O[i]) + Math.abs(R[i + 1] - O[i + 1]) + Math.abs(R[i + 2] - O[i + 2]);
+        R[i + 3] = d0 < 2 ? 0 : Math.min(255, d0 * 64);       // soft ramp for tiny changes at the edges
+      }
+      sctx.putImageData(res, x0, y0);
       octx.drawImage(scratch, x0, y0, bw, bh, x0, y0, bw, bh);
     }
   }
