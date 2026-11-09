@@ -395,10 +395,7 @@ $('fileInput').addEventListener('change', e => {
   stopCamera();
   const img = new Image();
   img.onload = () => {
-    // New photo = new client: start with a clean treatment plan.
-    state.plan.clear(); state.promptEdited = false;
-    $('clearToggle').checked = false; $('clientName').value = '';
-    changed();
+    clearSession();
     setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight));
     URL.revokeObjectURL(img.src);
   };
@@ -449,7 +446,15 @@ function stopCamera() {
   ['video', 'camGuide', 'snapBtn', 'cancelCamBtn'].forEach(id => $(id).hidden = true);
 }
 
+// New photo = new client: start with a clean treatment plan.
+function clearSession() {
+  state.plan.clear(); state.promptEdited = false;
+  $('clearToggle').checked = false; $('clientName').value = '';
+  changed();
+}
+
 $('resetBtn').addEventListener('click', () => {
+  clearSession();
   state.photo = null; state.versions = []; state.current = -1; state.faceL = null; state.photoImg = null;
   $('stage').style.aspectRatio = '';
   setAreas(false);
