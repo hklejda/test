@@ -139,8 +139,17 @@
         });
         break;
       case 'tearTrough':
-        sides(sx => out.push({ t: 'W', c: off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.062), rx: 0.11 * W * sv, ry: 0.055 * W, ang,
-          amt: Math.min(1, 2.0 * f * sv), W, rs: 0.007, rb: 0.05, darkOnly: true }));
+        sides(sx => {
+          // the trough runs from the inner eye corner down and outward under the eye
+          const inner = P(sx < 0 ? 133 : 362), lower = P(sx < 0 ? 145 : 374);
+          const a = off(inner, -0.005 * sx, 0.035), b2 = off(lower, 0.035 * sx, 0.075);
+          const c = mid(a, b2), ang2 = Math.atan2(b2.y - a.y, b2.x - a.x), len = dist(a, b2);
+          // 1) fill the hollow's shadow up to the lit cheek level below it
+          out.push({ t: 'S', grp: 'tear', c, rx: len * 0.7 + 0.02 * W, ry: 0.05 * W, ang: ang2, amt: Math.min(2.2, 1.9 * f * sv), W, vis: sv });
+          // 2) even out the groove and soften the bag edge above it (per-channel, no tint)
+          out.push({ t: 'W', c: off(c, 0, -0.005), rx: len * 0.75 + 0.03 * W, ry: 0.06 * W * sv, ang: ang2,
+            amt: Math.min(1, 2.2 * f * sv), W, rs: 0.006, rb: 0.085, darkOnly: true, brightK: 0.5 });
+        });
         break;
       case 'eyeBright':
         sides(sx => {
