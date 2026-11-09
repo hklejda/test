@@ -69,6 +69,11 @@
       152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109].map(P);
     const edgeCap = (c, r) => Math.min(r, Math.max(0.05 * W, 0.92 * Math.min(...OVAL_PTS.map(q => dist(q, c)))));
 
+    const ellipsePoly = (c, rx, ry, a, n = 28) => Array.from({ length: n }, (_, i) => {
+      const t = (i / n) * Math.PI * 2, x = Math.cos(t) * rx, y = Math.sin(t) * ry;
+      return { x: c.x + x * Math.cos(a) - y * Math.sin(a), y: c.y + x * Math.sin(a) + y * Math.cos(a) };
+    });
+
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
     // Lip expansion: lips grow away from the line where they meet (stomion);
@@ -128,10 +133,16 @@
         sides(sx => {
           // whole fold: from beside the nostril to just below the mouth corner
           const a = off(P(sx < 0 ? 129 : 358), 0.008 * sx, 0), m = off(P(sx < 0 ? 61 : 291), 0.03 * sx, 0.045), len = dist(a, m);
-          out.push({ t: 'W', c: mid(a, m), rx: len * 0.62 + 0.02 * W, ry: 0.075 * W * sv,
-            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.085, darkOnly: true, brightK: 0.45 });
-          // filler supports the fold: slight lift of the cheek mass above it
-          push(off(mid(a, m), 0.04 * sx, -0.01), 0.07 * W, 0.08 * W, 0.004 * sx, -0.012);
+          // fold area as a band along the fold; lips and mouth corners cut out (their natural
+          // shadows must stay, otherwise the corners get a light patch)
+          out.push({ t: 'W', poly: ellipsePoly(mid(a, m), len * 0.62 + 0.02 * W, 0.075 * W * sv, Math.atan2(m.y - a.y, m.x - a.x)),
+            cut: [{ poly: LIPS.map(P), grow: 0.035 * W },
+              { poly: [P(sx < 0 ? 61 : 291), off(P(sx < 0 ? 61 : 291), 0.012 * sx, 0.004)], grow: 0.045 * W, line: true },   // mouth corner
+              { poly: (sx < 0 ? [98, 64, 129] : [327, 294, 358]).map(P), grow: 0.022 * W, line: true }],                      // nostril wing
+            c: mid(a, m), rx: len * 0.62 + 0.02 * W, ry: 0.075 * W, ang, feather: 0.02,
+            amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.085, darkOnly: true, brightK: 0.45 });
+          // filler supports the fold: slight lift of the cheek mass above it (kept away from the mouth)
+          push(off(mid(a, m), 0.05 * sx, -0.025), 0.055 * W, 0.065 * W, 0.004 * sx, -0.012);
         });
         break;
       case 'marionette':
