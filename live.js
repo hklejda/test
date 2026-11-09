@@ -139,7 +139,7 @@ void main() {
     try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
   })();
 
-  let overlay = null, octx = null, scratch = null, sctx = null, lastW = [];
+  let overlay = null, octx = null, scratch = null, sctx = null, lastW = [], overlayUsed = false;
   let gl = null, prog = null, texObj = null, loc = {}, raf = 0, running = false;
   let video = null, canvas = null, getItems = null, onStatus = null, landmarker = null;
   let smooth = null, lastTs = -1, bypass = false, missed = 0;
@@ -220,10 +220,15 @@ void main() {
   }
 
   // Wrinkle smoothing: read back just those areas, run the photo pipeline's filter, draw on an overlay.
+  // CPU filters (tear troughs, folds…). The finished frame and the treated areas are composed on
+  // ONE 2D canvas (the overlay), so both go through the same colour pipeline — on iPhone Safari the
+  // WebGL canvas and a 2D canvas render colours slightly differently, which showed as rectangles.
   function cpuPost(W, w, h) {
     if (!overlay) return;
     if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; scratch.width = w; scratch.height = h; }
-    octx.clearRect(0, 0, w, h);
+    if (!lastW.length) { if (overlayUsed) { octx.clearRect(0, 0, w, h); overlayUsed = false; } return; }
+    octx.drawImage(canvas, 0, 0, w, h);                 // full treated frame from WebGL, opaque
+    overlayUsed = true;
     for (const d of lastW) {
       let x0, y0, x1, y1;
       if (d.poly) {
@@ -236,19 +241,22 @@ void main() {
         x1 = Math.min(w, Math.ceil(d.c.x + R)); y1 = Math.min(h, Math.ceil(d.c.y + R));
       }
       const bw = x1 - x0, bh = y1 - y0;
-      if (bw < 4 || bh < 4) continue;
-      const buf = new Uint8Array(bw * bh * 4);
-      gl.readPixels(x0, h - y1, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);   // GL rows are bottom-up
-      const img = sctx.createImageData(bw, bh);
-      for (let y = 0; y < bh; y++) img.data.set(buf.subarray((bh - 1 - y) * bw * 4, (bh - y) * bw * 4), y * bw * 4);
-      sctx.putImageData(img, x0, y0);
+      if (bw < 8 || bh < 8) continue;
+      const src = octx.getImageData(x0, y0, bw, bh);      // same canvas, same colours
+      sctx.clearRect(x0, y0, bw, bh);
+      sctx.putImageData(src, x0, y0);
       Warp.cpuFilter(sctx, w, h, d);
-      // Lay back ONLY the pixels the filter changed; everything else in the box stays transparent,
-      // so the box edge can never show (phones: frame lag and colour handling differ).
-      const res = sctx.getImageData(x0, y0, bw, bh), R = res.data, O = img.data;
-      for (let i = 0; i < R.length; i += 4) {
-        const d0 = Math.abs(R[i] - O[i]) + Math.abs(R[i + 1] - O[i + 1]) + Math.abs(R[i + 2] - O[i + 2]);
-        R[i + 3] = d0 < 2 ? 0 : Math.min(255, d0 * 64);       // soft ramp for tiny changes at the edges
+      const res = sctx.getImageData(x0, y0, bw, bh), R = res.data, O = src.data;
+      const fb = Math.max(4, Math.round(0.08 * Math.min(bw, bh)));   // soft fade toward the box edges
+      for (let y = 0; y < bh; y++) {
+        const ey = Math.min(1, Math.min(y, bh - 1 - y) / fb);
+        for (let x = 0; x < bw; x++) {
+          const i = (y * bw + x) * 4;
+          const ex = Math.min(1, Math.min(x, bw - 1 - x) / fb);
+          const diff = Math.abs(R[i] - O[i]) + Math.abs(R[i + 1] - O[i + 1]) + Math.abs(R[i + 2] - O[i + 2]);
+          const a = Math.min(1, Math.max(0, (diff - 4) / 10)) * ex * ey;   // ignore tiny round-trip noise
+          R[i + 3] = Math.round(255 * a);
+        }
       }
       sctx.putImageData(res, x0, y0);
       octx.drawImage(scratch, x0, y0, bw, bh, x0, y0, bw, bh);
@@ -310,7 +318,7 @@ void main() {
   function stop() {
     running = false;
     cancelAnimationFrame(raf);
-    if (octx) octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (octx) { octx.clearRect(0, 0, overlay.width, overlay.height); overlayUsed = false; }
   }
 
   // Raw (untreated) current frame as a canvas, mirrored like the preview.
