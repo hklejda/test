@@ -113,7 +113,8 @@ function renderTabs() {
     const b = document.createElement('button');
     b.className = 'cat-tab' + (c.id === state.cat ? ' on' : '');
     b.setAttribute('role', 'tab');
-    b.innerHTML = `<span class="ic">${c.icon}</span><span class="nm">${c.short}</span>${count ? `<span class="ct">${count}</span>` : ''}`;
+    b.setAttribute('aria-selected', c.id === state.cat);
+    b.innerHTML = `<span class="nm">${c.short}</span>${count ? `<span class="ct">${count}</span>` : ''}`;
     b.onclick = () => { state.cat = c.id; state.area = 'All'; renderBuilder(); };
     wrap.appendChild(b);
   }
@@ -146,40 +147,40 @@ function renderGrid() {
 function card(t) {
   const on = state.plan.has(t.id);
   const el = document.createElement('div');
-  el.className = 't-card' + (on ? ' on' : '');
-  el.innerHTML = `
-    <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
-    <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${Warp.isFilter(t.id) ? 'filter' : 'reshape'}</span>`;
-  if (on) {
-    el.querySelector('.t-top').onclick = () => toggle(t.id);
-    el.querySelector('.t-check').title = 'Remove';
-  } else {
-    el.onclick = () => toggle(t.id);
-  }
+  el.className = 't-row' + (on ? ' on' : '');
+  const main = document.createElement('button');
+  main.className = 't-main';
+  main.setAttribute('aria-pressed', on);
+  main.innerHTML = `<span class="t-name">${t.name}</span><span class="t-desc">${t.desc}</span>`;
+  main.onclick = () => toggle(t.id);
+  el.appendChild(main);
 
-  if (on) {
+  const side = document.createElement('div');
+  side.className = 't-side';
+  if (!on) {
+    side.innerHTML = `<span class="t-range">${t.type === 'dose' ? `${fmtNum(t.min)}–${fmtNum(t.max)} ${catById[t.cat].unit}` : ''}</span>`;
+    side.onclick = () => toggle(t.id);
+  } else {
     const v = state.plan.get(t.id);
-    const ctrl = document.createElement('div');
     if (t.type === 'dose') {
-      ctrl.className = 'ctrl';
-      ctrl.innerHTML = `<button aria-label="Less">−</button><span class="val">${doseText(t, v)}</span><button aria-label="More">+</button>`;
-      const [minus, , plus] = ctrl.children;
-      minus.onclick = e => { e.stopPropagation(); setVal(t.id, Math.max(t.min, round(v - t.step))); };
-      plus.onclick = e => { e.stopPropagation(); setVal(t.id, Math.min(t.max, round(v + t.step))); };
+      side.innerHTML = `<div class="ctrl"><button aria-label="Less ${t.name}">−</button><span class="val">${doseText(t, v)}</span><button aria-label="More ${t.name}">+</button></div>`;
+      const [minus, , plus] = side.querySelector('.ctrl').children;
+      minus.disabled = v <= t.min; plus.disabled = v >= t.max;
+      minus.onclick = () => setVal(t.id, Math.max(t.min, round(v - t.step)));
+      plus.onclick = () => setVal(t.id, Math.min(t.max, round(v + t.step)));
     } else {
-      ctrl.className = 'lvl';
+      const lv = document.createElement('div'); lv.className = 'lvl';
       for (let i = 1; i <= 3; i++) {
         const b = document.createElement('button');
         b.textContent = LEVELS[i];
         if (i === v) b.className = 'on';
-        b.onclick = e => { e.stopPropagation(); setVal(t.id, i); };
-        ctrl.appendChild(b);
+        b.onclick = () => setVal(t.id, i);
+        lv.appendChild(b);
       }
+      side.appendChild(lv);
     }
-    ctrl.addEventListener('click', e => e.stopPropagation());
-    el.appendChild(ctrl);
   }
+  el.appendChild(side);
   return el;
 }
 
@@ -203,12 +204,12 @@ function renderPlan() {
     if (!items.length) continue;
     const g = document.createElement('div');
     g.className = 'plan-group';
-    g.innerHTML = `<h3>${c.icon} ${c.name}</h3>`;
+    g.innerHTML = `<h3>${c.name}</h3>`;
     for (const [id, v] of items) {
       const t = byId[id];
       const row = document.createElement('div');
       row.className = 'plan-item';
-      row.innerHTML = `<span class="pi-name">${t.name} <span class="pi-area">· ${t.area}</span></span>
+      row.innerHTML = `<span class="pi-name">${t.name}</span>
         <span class="pi-dose">${doseText(t, v)}</span><button class="x" aria-label="Remove ${t.name}">×</button>`;
       row.querySelector('.x').onclick = () => { state.plan.delete(id); changed(); };
       g.appendChild(row);
@@ -283,7 +284,7 @@ function updateUI() {
   const any = state.plan.size || clearOn();
   $('applyBtn').disabled = !(state.photo && any && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
   $('applyHint').textContent =
-    !state.photo ? 'Upload a photo or use ● Live.' :
+    !state.photo ? 'Upload a photo or start Live.' :
     !any ? 'Select treatments — the preview updates instantly.' :
     needFace && state.face === 'loading' ? 'Mapping the face… one moment.' :
     needFace && state.face !== 'ok' ? 'Face not mapped — use a clear, front-facing photo.' :
@@ -344,16 +345,16 @@ function setFaceStatus(kind, text) {
 
 async function mapFace(dataUrl) {
   state.faceL = null;
-  setFaceStatus('loading', '⏳ Mapping face…');
+  setFaceStatus('loading', 'Finding the face…');
   try {
     const img = await loadImage(dataUrl);
     if (state.photo !== dataUrl) return;            // photo changed meanwhile
     state.photoImg = img;
     const L = await Face.detect(img);
     if (state.photo !== dataUrl) return;
-    if (!L) { setFaceStatus('missing', '⚠ No face found. Use a clear, front-facing photo.'); return; }
+    if (!L) { setFaceStatus('missing', 'No face found. Try a clear, front-facing photo.'); return; }
     state.faceL = L;
-    setFaceStatus('ok', '✓ Face mapped — adjust treatments and the preview updates instantly');
+    setFaceStatus('ok', 'Face found. Choose treatments and the result updates as you go.');
     autoPreview();
     if (state.autoGenerate) {                         // captured from Live: show the result right away
       state.autoGenerate = false;
@@ -450,6 +451,7 @@ function stopCamera() {
 
 $('resetBtn').addEventListener('click', () => {
   state.photo = null; state.versions = []; state.current = -1; state.faceL = null; state.photoImg = null;
+  $('stage').style.aspectRatio = '';
   setAreas(false);
   setFaceStatus('none', '');
   ['singleImg', 'compare', 'downloadBtn', 'printBtn', 'viewToggle', 'historyWrap', 'resetBtn'].forEach(id => $(id).hidden = true);
@@ -784,6 +786,12 @@ $('liveCaptureBtn').addEventListener('click', () => {
 const hold = on => { Live.setBypass(on); $('liveHoldBtn').classList.toggle('on', on); $('liveHoldBtn').textContent = on ? 'Before (release for after)' : 'Hold to see before'; };
 $('liveHoldBtn').addEventListener('pointerdown', e => { e.preventDefault(); hold(true); });
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('liveHoldBtn').addEventListener(ev, () => hold(false)));
+
+// The mirror takes the photo's own shape (no letterbox bars).
+$('singleImg').addEventListener('load', () => {
+  const im = $('singleImg');
+  if (!state.live && im.naturalWidth) $('stage').style.aspectRatio = `${im.naturalWidth} / ${im.naturalHeight}`;
+});
 
 /* ================= Init ================= */
 renderStyles();

@@ -6,54 +6,49 @@
   <title>Aesthetic Preview</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=202611091538" />
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=202611091618" />
 </head>
 <body>
   <header class="top">
-    <div class="brand">
-      <span class="logo">◐</span>
-      <div>
-        <h1>Aesthetic Preview</h1>
-        <p class="tagline">Treatment visualization studio</p>
-      </div>
-    </div>
-
-    <ol class="steps" aria-label="Progress">
-      <li id="step1" class="active"><span>1</span> Photo</li>
-      <li id="step2"><span>2</span> Treatment plan</li>
-      <li id="step3"><span>3</span> Preview</li>
-    </ol>
-
-    <button id="settingsBtn" class="ghost">⚙ Settings</button>
+    <a class="wordmark" href="./" aria-label="Aesthetic Preview, start over">Aesthetic <em>Preview</em></a>
+    <button id="settingsBtn" class="quiet" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg>
+      Settings
+    </button>
   </header>
 
+  <!-- kept for app.js (progress state); not shown -->
+  <ol class="steps" hidden><li id="step1"></li><li id="step2"></li><li id="step3"></li></ol>
+
   <main class="layout">
-    <!-- ============ LEFT: photo & result ============ -->
-    <section class="panel stage-panel">
-      <div class="panel-head">
-        <h2>Client photo</h2>
-        <div class="row">
-          <button id="liveBtn" class="ghost sm live-btn">● Live</button>
-          <button id="cameraBtn" class="ghost sm" hidden>📷 Camera</button>
-          <label class="ghost sm file-btn">⬆ Upload
-            <input id="fileInput" type="file" accept="image/*" hidden />
-          </label>
-        </div>
+    <!-- ============ Mirror ============ -->
+    <section class="mirror" aria-label="Photo and result">
+      <div class="mirror-bar">
+        <label class="btn btn-solid file-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          Upload photo
+          <input id="fileInput" type="file" accept="image/*" hidden />
+        </label>
+        <button id="liveBtn" class="btn btn-line live-btn"><span class="rec" aria-hidden="true"></span>Live</button>
+        <button id="cameraBtn" hidden>Camera</button>
+        <span class="spacer"></span>
+        <button id="resetBtn" class="quiet" hidden>New photo</button>
       </div>
 
       <div id="stage" class="stage">
         <div id="placeholder" class="placeholder">
-          <div class="face-outline" aria-hidden="true"></div>
-          <p><strong>Upload a front-facing photo — or use ● Live</strong></p>
-          <p class="hint">Good even light · hair away from face · neutral expression · no filters</p>
+          <svg class="oval" viewBox="0 0 120 150" aria-hidden="true"><ellipse cx="60" cy="75" rx="52" ry="68"/></svg>
+          <p class="ph-title">Start with a face</p>
+          <p class="ph-text">Upload a front-facing photo, or use Live to see treatments on the camera in real time.</p>
+          <p class="ph-tip">Even light, hair off the face, relaxed expression.</p>
         </div>
 
         <video id="video" playsinline autoplay muted hidden></video>
-        <div id="camGuide" class="cam-guide" hidden></div>
+        <div id="camGuide" hidden></div>
         <canvas id="liveCanvas" hidden></canvas>
         <canvas id="liveOverlay" hidden></canvas>
-        <div id="liveBadge" class="live-badge" hidden><span class="dot"></span> LIVE</div>
+        <div id="liveBadge" class="live-badge" hidden><span class="rec" aria-hidden="true"></span>Live</div>
         <div id="liveStatus" class="live-status" hidden></div>
 
         <img id="singleImg" class="single" alt="Client photo" hidden />
@@ -61,8 +56,8 @@
         <div id="compare" class="compare" hidden>
           <img id="afterImg" alt="After" />
           <img id="beforeImg" alt="Before" />
-          <div id="divider" class="divider"><span>⇔</span></div>
-          <input id="compareRange" type="range" min="0" max="100" value="50" aria-label="Before / after" />
+          <div id="divider" class="divider"><span class="knob" aria-hidden="true"></span></div>
+          <input id="compareRange" type="range" min="0" max="100" value="50" aria-label="Drag to compare before and after" />
           <span class="tag tag-l">Before</span>
           <span class="tag tag-r">After</span>
         </div>
@@ -71,123 +66,107 @@
 
         <div id="loading" class="loading" hidden>
           <div class="spinner"></div>
-          <p id="loadingText">Generating…</p>
-          <p class="hint light">Usually 10–40 seconds</p>
+          <p id="loadingText">Working…</p>
         </div>
       </div>
 
-      <p id="faceStatus" class="face-status" hidden></p>
-      <p id="liveNote" class="hint" hidden>Live shows every treatment with a real effect without AI in real time — fillers, folds, under-eyes, brow lift, lip flip, jaw slimming and gummy smile — plus the Clear face switch. Adjust doses while watching; after capture, AI can refine skin &amp; fold treatments. Adjust doses on the right while watching. AI treatments are hidden in Live.</p>
+      <div class="mirror-foot">
+        <p id="faceStatus" class="face-status" hidden></p>
+        <p id="liveNote" class="note" hidden>Treatments show on the camera as you choose them. Hold “Before” to compare, then capture.</p>
 
-      <div class="row stage-actions">
-        <button id="liveCaptureBtn" class="primary" hidden>📸 Capture</button>
-        <button id="liveHoldBtn" class="ghost" hidden>Hold to see before</button>
-        <button id="liveExitBtn" class="ghost" hidden>Exit live</button>
-        <button id="snapBtn" class="primary" hidden>Capture photo</button>
-        <button id="cancelCamBtn" class="ghost" hidden>Cancel</button>
-        <div id="viewToggle" class="seg" hidden>
-          <button data-view="compare" class="on">Compare</button>
-          <button data-view="side">Side by side</button>
-          <button data-view="after">After</button>
-          <button data-view="raw" id="rawViewBtn" title="The AI's full output, before keeping untreated areas original">Raw AI</button>
+        <div class="row stage-actions">
+          <button id="liveCaptureBtn" class="btn btn-solid" hidden>Capture</button>
+          <button id="liveHoldBtn" class="btn btn-line" hidden>Hold to see before</button>
+          <button id="liveExitBtn" class="quiet" hidden>Exit live</button>
+          <button id="snapBtn" hidden>Capture photo</button>
+          <button id="cancelCamBtn" hidden>Cancel</button>
+          <div id="viewToggle" class="seg" hidden>
+            <button data-view="compare" class="on">Slider</button>
+            <button data-view="side">Side by side</button>
+            <button data-view="after">After</button>
+            <button data-view="raw" id="rawViewBtn" hidden>Raw</button>
+          </div>
+          <span class="spacer"></span>
+          <a id="downloadBtn" class="quiet" download="aesthetic-preview.jpg" hidden>Save image</a>
+          <button id="printBtn" class="quiet" hidden>Print report</button>
         </div>
-        <span class="spacer"></span>
-        <a id="downloadBtn" class="ghost sm" download="aesthetic-preview.jpg" hidden>⬇ Image</a>
-        <button id="printBtn" class="ghost sm" hidden>🖨 Report</button>
-        <button id="resetBtn" class="ghost sm" hidden>New photo</button>
       </div>
 
-      <div id="historyWrap" class="history" hidden>
-        <p class="label">Versions</p>
-        <div id="history" class="history-strip"></div>
-      </div>
+      <div id="historyWrap" hidden><div id="history"></div></div>
     </section>
 
-    <!-- ============ RIGHT: builder + plan ============ -->
-    <div class="right-col">
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Choose treatments</h2>
-        </div>
-
+    <!-- ============ Controls ============ -->
+    <aside class="rail" aria-label="Treatments">
+      <section class="block">
+        <h2>Treatments</h2>
         <div id="catTabs" class="cat-tabs" role="tablist"></div>
-        <p id="catBlurb" class="hint"></p>
-        <div id="areaFilter" class="chips"></div>
-        <div id="treatGrid" class="treat-grid"></div>
+        <p id="catBlurb" hidden></p>
+        <div id="areaFilter" hidden></div>
+        <div id="treatGrid" class="treat-list"></div>
       </section>
 
-      <section class="panel plan-panel">
-        <div class="panel-head">
-          <h2>Treatment plan</h2>
-          <button id="clearBtn" class="link">Clear</button>
-        </div>
-
-        <label class="field"><span>Client name <span class="muted">(optional, for report)</span></span>
-          <input id="clientName" placeholder="e.g. A. Hoxha" />
+      <section class="block">
+        <h2>Look</h2>
+        <div id="styleSeg" class="seg full"></div>
+        <p id="styleHint" class="hint"></p>
+        <label class="switch">
+          <input id="clearToggle" type="checkbox" />
+          <span class="track" aria-hidden="true"></span>
+          <span class="switch-text">Clear face<small>Brighter, fresher skin for viewing</small></span>
         </label>
 
-        <div class="field">
-          <span>Result style</span>
-          <div id="styleSeg" class="seg full"></div>
-          <p id="styleHint" class="hint"></p>
+        <div hidden>
+          <input id="protectToggle" type="checkbox" checked />
+          <button id="areasBtn" disabled>Show areas</button>
         </div>
+      </section>
 
-        <div class="protect">
-          <label class="switch">
-            <input id="clearToggle" type="checkbox" />
-            <span class="track"></span>
-            <span><strong>✨ Clear face</strong><br /><span class="hint">Brighter, fresher skin — just for viewing</span></span>
-          </label>
+      <section class="block plan">
+        <div class="block-head">
+          <h2>Plan</h2>
+          <button id="clearBtn" class="quiet">Clear all</button>
         </div>
-
-        <div class="protect" hidden>
-          <label class="switch">
-            <input id="protectToggle" type="checkbox" checked />
-            <span class="track"></span>
-            <span><strong>Change only selected areas</strong><br /><span class="hint">Everything else stays exactly as in the original photo</span></span>
-          </label>
-          <button id="areasBtn" class="ghost sm" disabled>👁 Show areas</button>
-        </div>
-
         <div id="planList" class="plan-list"></div>
-        <p id="planEmpty" class="hint center">No treatments selected yet. Pick from the categories above.</p>
+        <p id="planEmpty" class="hint">Nothing selected yet.</p>
 
-        <div class="totals">
-          <div><span class="muted">Filler</span><strong id="totFiller">0 mL</strong></div>
-          <div><span class="muted">Botox</span><strong id="totBotox">0 U</strong></div>
-          <div><span class="muted">Treatments</span><strong id="totCount">0</strong></div>
+        <dl class="totals">
+          <div><dt>Filler</dt><dd id="totFiller">0 mL</dd></div>
+          <div><dt>Botox</dt><dd id="totBotox">0 U</dd></div>
+          <div><dt>Treatments</dt><dd id="totCount">0</dd></div>
+        </dl>
+
+        <label class="field"><span class="field-label">Client name <span class="muted">for the report</span></span>
+          <input id="clientName" placeholder="Optional" autocomplete="off" />
+        </label>
+
+        <div hidden>
+          <textarea id="promptText"></textarea>
+          <button id="resetPromptBtn">Rebuild</button>
+          <button id="applyBtn" disabled>Generate</button>
         </div>
-
-        <details class="prompt-box" hidden>
-          <summary>Advanced · AI prompt</summary>
-          <textarea id="promptText" rows="10" spellcheck="false"></textarea>
-          <button id="resetPromptBtn" class="link">Rebuild from plan</button>
-        </details>
-
-        <button id="applyBtn" class="primary big" disabled hidden>✨ Generate preview</button>
-        <p id="applyHint" class="hint center"></p>
+        <p id="applyHint" class="hint"></p>
         <p id="error" class="error" hidden></p>
       </section>
-    </div>
+    </aside>
   </main>
 
   <footer class="foot">
-    Visualization for consultation purposes only. Not a medical result or a guarantee of outcome. Doses shown are general reference ranges; treatment must be decided by a qualified practitioner.
-    <span class="ver">· version 202611091538</span>
+    <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
+    <p class="ver">version 202611091618</p>
   </footer>
 
   <!-- ============ Print report ============ -->
   <section id="report" class="report" aria-hidden="true">
     <header>
-      <h1>Treatment Preview</h1>
+      <h1>Treatment preview</h1>
       <p id="rMeta"></p>
     </header>
     <div class="r-images">
       <figure><img id="rBefore" alt="Before" /><figcaption>Before</figcaption></figure>
-      <figure><img id="rAfter" alt="After (simulation)" /><figcaption>After · simulation</figcaption></figure>
+      <figure><img id="rAfter" alt="After (simulation)" /><figcaption>After, simulated</figcaption></figure>
     </div>
     <table id="rTable"></table>
-    <p class="r-note">Visualization for consultation only. Actual results vary. Doses are reference values and do not replace clinical assessment.</p>
+    <p class="r-note">A visual simulation for consultations. Actual results vary. Doses are reference values and do not replace clinical assessment.</p>
   </section>
 
   <!-- ============ Settings ============ -->
@@ -195,41 +174,30 @@
     <form method="dialog" class="settings-form">
       <h2>Settings</h2>
       <div hidden>
-      <label class="field">fal API key
-        <input id="keyInput" type="password" placeholder="xxxxxxxx-xxxx-…:…" autocomplete="off" />
-      </label>
-      <p class="hint">Stored only in this browser. Get one at fal.ai → Dashboard → Keys. Don't save it on a shared device.</p>
-
-      <label class="field">AI model
+        <input id="keyInput" type="password" autocomplete="off" />
         <select id="modelSelect">
-          <option value="fal-ai/nano-banana-2/edit">Nano Banana 2 · edit (recommended)</option>
-          <option value="fal-ai/nano-banana-pro/edit">Nano Banana Pro · edit (higher quality)</option>
-          <option value="fal-ai/bytedance/seedream/v5/lite/edit">Seedream 5.0 Lite · edit</option>
-          <option value="fal-ai/flux-2-pro/edit">FLUX.2 [pro] · edit</option>
-          <option value="custom">Custom endpoint…</option>
+          <option value="fal-ai/nano-banana-2/edit">Nano Banana 2</option>
+          <option value="custom">Custom</option>
         </select>
-      </label>
-      <label id="customWrap" class="field" hidden>Custom endpoint ID
-        <input id="customModel" placeholder="owner/model/edit" />
-      </label>
+        <label id="customWrap" hidden><input id="customModel" /></label>
       </div>
 
-      <label class="field"><span>Clinic name <span class="muted">(shown on report)</span></span>
+      <label class="field"><span class="field-label">Clinic name <span class="muted">shown on the report</span></span>
         <input id="clinicInput" placeholder="Your clinic" />
       </label>
 
       <div class="row end">
-        <button value="cancel" class="ghost">Close</button>
-        <button id="saveSettings" value="save" class="primary">Save</button>
+        <button value="cancel" class="quiet">Close</button>
+        <button id="saveSettings" value="save" class="btn btn-solid">Save</button>
       </div>
     </form>
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611091538"></script>
-  <script src="face.js?v=202611091538"></script>
-  <script src="live.js?v=202611091538"></script>
-  <script src="warp.js?v=202611091538"></script>
-  <script src="app.js?v=202611091538"></script>
+  <script src="data.js?v=202611091618"></script>
+  <script src="face.js?v=202611091618"></script>
+  <script src="live.js?v=202611091618"></script>
+  <script src="warp.js?v=202611091618"></script>
+  <script src="app.js?v=202611091618"></script>
 </body>
 </html>
