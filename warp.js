@@ -193,24 +193,31 @@
         push(P(4), 0.07 * W, 0.06 * W, 0, -0.014);
         break;
       case 'browLift':
-        // Botox brow lift: the brow moves up as one piece — inner end stays, lift grows smoothly
-        // toward the tail. Kernels follow the brow and are tall, so brow + surrounding skin move
-        // together (no stretching, no kinks).
+        // Botox brow lift: the brow moves up as one piece. Inner end stays; the ARCH (≈ 2/3 along,
+        // above the outer iris) rises most; the tail a bit less. Kernels are centred just under the
+        // brow, so brow + upper-lid skin move together (eye area opens, brow keeps its thickness),
+        // while the forehead above absorbs the movement. Dense, wide kernels → smooth, no waves.
         sides(sx => {
           const line = (sx < 0 ? [107, 66, 105, 63, 70, 46] : [336, 296, 334, 293, 300, 276]).map(P);   // inner → tail
-          const tail = line[line.length - 1];
-          const pts = [];
-          for (let i = 0; i < line.length; i++) { pts.push(line[i]); if (i < line.length - 1) pts.push(mid(line[i], line[i + 1])); }
-          pts.push(off(tail, 0.03 * sx, 0.015));               // a little past the tail
-          const lift = 0.04 * W * f * VIS[sx], k = 2.6;          // overlap factor
-          pts.forEach((q, i) => {
-            const t = i / (pts.length - 1), g = t * t * (3 - 2 * t);   // smooth 0 → 1 from inner end to tail
-            if (g < 0.02) return;
-            const v = vec(0, -1);
-            const amt = (lift * g) / k;
-            out.push({ t: 'p', c: off(q, 0, 0.012), rx: 0.05 * W * sv, ry: 0.075 * W, ang,
-              vx: v.x / W * amt, vy: v.y / W * amt });
-          });
+          const cum = [0];
+          for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + dist(line[i - 1], line[i]));
+          const total = cum[cum.length - 1];
+          const at = u => {                                      // point at fraction u along the brow
+            const d = u * total; let i = 1; while (i < cum.length - 1 && cum[i] < d) i++;
+            const t = (d - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]);
+            return { x: line[i - 1].x + t * (line[i].x - line[i - 1].x), y: line[i - 1].y + t * (line[i].y - line[i - 1].y) };
+          };
+          const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+          const N = 14, lift = 0.036 * W * f * VIS[sx], rx = 0.07 * W * sv;
+          const spacing = total / (N - 1), overlap = (rx * 2 * 0.53) / Math.max(1, spacing);   // ∫(1-s²)² ≈ 0.53·2r
+          const v = vec(0, -1);
+          for (let n = 0; n < N; n++) {
+            const u = n / (N - 1);
+            const prof = ss(0.12, 0.62, u) * (1 - 0.2 * ss(0.75, 1, u));   // 0 inner → 1 at arch → 0.8 at tail
+            if (prof < 0.01) continue;
+            const amt = (lift * prof) / overlap;
+            out.push({ t: 'p', c: off(at(u), 0, 0.03), rx, ry: 0.085 * W, ang, vx: v.x / W * amt, vy: v.y / W * amt });
+          }
         });
         break;
       case 'masseter':
