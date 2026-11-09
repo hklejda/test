@@ -149,10 +149,14 @@
         sides(sx => {
           // mouth corner down toward the jaw (marionette line + pre-jowl groove)
           const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.045 * sx, 0.2), len = dist(a, b2);
-          out.push({ t: 'W', c: off(mid(a, b2), 0.006 * sx, 0), rx: len * 0.62, ry: 0.075 * W * sv,
-            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.08, darkOnly: true, brightK: 0.45 });
-          // lift the mouth corners slightly (no downturned look)
-          push(off(a, 0.005 * sx, 0.01), 0.05 * W, 0.05 * W, 0, -0.012);
+          const cm = off(mid(a, b2), 0.006 * sx, 0), am = Math.atan2(b2.y - a.y, b2.x - a.x);
+          // lips and the mouth corner itself are excluded, so the lips are never altered
+          out.push({ t: 'W', poly: ellipsePoly(cm, len * 0.62, 0.075 * W * sv, am),
+            cut: [{ poly: LIPS.map(P), grow: 0.035 * W }, { poly: [a, off(a, 0.012 * sx, 0.004)], grow: 0.045 * W, line: true }],
+            c: cm, rx: len * 0.62, ry: 0.075 * W, ang, feather: 0.02,
+            amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.08, darkOnly: true, brightK: 0.45 });
+          // the skin just below/outside the corner lifts slightly (no downturned look) — lips stay as they are
+          push(off(a, 0.03 * sx, 0.045), 0.04 * W, 0.045 * W, 0, -0.01);
         });
         break;
       case 'tearTrough':
