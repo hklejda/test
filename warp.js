@@ -196,7 +196,7 @@
           const pts = [];
           for (let i = 0; i < line.length; i++) { pts.push(line[i]); if (i < line.length - 1) pts.push(mid(line[i], line[i + 1])); }
           pts.push(off(tail, 0.03 * sx, 0.015));               // a little past the tail
-          const lift = 0.024 * W * f * VIS[sx], k = 2.6;          // overlap factor
+          const lift = 0.04 * W * f * VIS[sx], k = 2.6;          // overlap factor
           pts.forEach((q, i) => {
             const t = i / (pts.length - 1), g = t * t * (3 - 2 * t);   // smooth 0 → 1 from inner end to tail
             if (g < 0.02) return;
