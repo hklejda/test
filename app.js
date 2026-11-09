@@ -393,7 +393,14 @@ $('fileInput').addEventListener('change', e => {
   if (state.live) stopLive();
   stopCamera();
   const img = new Image();
-  img.onload = () => { setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight)); URL.revokeObjectURL(img.src); };
+  img.onload = () => {
+    // New photo = new client: start with a clean treatment plan.
+    state.plan.clear(); state.promptEdited = false;
+    $('clearToggle').checked = false; $('clientName').value = '';
+    changed();
+    setPhoto(resizeToDataURL(img, img.naturalWidth, img.naturalHeight));
+    URL.revokeObjectURL(img.src);
+  };
   img.onerror = () => showError('Could not read that image. Try a JPG or PNG.');
   img.src = URL.createObjectURL(file);
   e.target.value = '';
