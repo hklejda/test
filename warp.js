@@ -140,15 +140,15 @@
         break;
       case 'tearTrough':
         sides(sx => {
-          // the trough runs from the inner eye corner down and outward under the eye
-          const inner = P(sx < 0 ? 133 : 362), lower = P(sx < 0 ? 145 : 374);
-          const a = off(inner, -0.005 * sx, 0.035), b2 = off(lower, 0.035 * sx, 0.075);
-          const c = mid(a, b2), ang2 = Math.atan2(b2.y - a.y, b2.x - a.x), len = dist(a, b2);
-          // 1) fill the hollow's shadow up to the lit cheek level below it
-          out.push({ t: 'S', grp: 'tear', c, rx: len * 0.7 + 0.02 * W, ry: 0.05 * W, ang: ang2, amt: Math.min(2.2, 1.9 * f * sv), W, vis: sv });
-          // 2) even out the groove and soften the bag edge above it (per-channel, no tint)
-          out.push({ t: 'W', c: off(c, 0, -0.005), rx: len * 0.75 + 0.03 * W, ry: 0.06 * W * sv, ang: ang2,
-            amt: Math.min(1, 2.2 * f * sv), W, rs: 0.006, rb: 0.085, darkOnly: true, brightK: 0.5 });
+          // The hollow is a crescent that follows the lower eyelid. Area = band under the lid:
+          // from just below the lashes down onto the upper cheek, inner corner to outer third.
+          const lid = (sx < 0 ? [133, 155, 154, 153, 145, 144, 163, 7, 33] : [362, 382, 381, 380, 374, 373, 390, 249, 263]).map(P);
+          const top = lid.map(q => off(q, 0, 0.022)), bot = lid.slice().reverse().map(q => off(q, 0, 0.115));
+          const c = off(P(sx < 0 ? 145 : 374), 0, 0.06);
+          // reference skin: the upper cheek just below the crescent
+          const ref = off(P(sx < 0 ? 145 : 374), 0.01 * sx, 0.17);
+          out.push({ t: 'U', poly: [...top, ...bot], c, rx: 0.14 * W, ry: 0.08 * W, ang, ref, refR: 0.035 * W,
+            amt: Math.min(1, 0.95 * f * sv), W, feather: 0.02 });
         });
         break;
       case 'eyeBright':
@@ -341,7 +341,7 @@
     if (d.poly) {
       const m = document.createElement('canvas'); m.width = bw; m.height = bh;
       const mc = m.getContext('2d');
-      const feather = Math.max(2, 0.025 * d.W);
+      const feather = Math.max(2, (d.feather || 0.025) * d.W);
       mc.filter = `blur(${feather}px)`;
       mc.fillStyle = '#fff';
       mc.beginPath(); d.poly.forEach((q, i) => (i ? mc.lineTo(q.x - x0, q.y - y0) : mc.moveTo(q.x - x0, q.y - y0))); mc.closePath(); mc.fill();
@@ -445,15 +445,55 @@
     ctx.putImageData(R.img, R.x0, R.y0);
   }
 
+  // Under-eye: blend the dark crescent toward the colour of the cheek just below it.
+  // Works on a blurred (base) layer and keeps the fine texture on top, so it never looks
+  // painted; only pixels darker than the cheek are changed.
+  function underEye(ctx, w, h, d) {
+    const R = region(ctx, w, h, d); if (!R || !R.wmap) return;
+    const { bw, bh, P, x0, y0 } = R, n = bw * bh;
+    // reference colour from the cheek patch (read from the full canvas)
+    const rr = Math.max(2, Math.round(d.refR));
+    const rx0 = Math.max(0, Math.round(d.ref.x - rr)), ry0 = Math.max(0, Math.round(d.ref.y - rr));
+    const rw = Math.min(w - rx0, 2 * rr), rh = Math.min(h - ry0, 2 * rr);
+    if (rw < 2 || rh < 2) return;
+    const RP = ctx.getImageData(rx0, ry0, rw, rh).data;
+    const Ys = [];
+    for (let i = 0; i < rw * rh; i++) Ys.push([0.299 * RP[i * 4] + 0.587 * RP[i * 4 + 1] + 0.114 * RP[i * 4 + 2], i]);
+    Ys.sort((a, b) => a[0] - b[0]);
+    const ref = [0, 0, 0]; let cnt = 0;
+    for (let j = Math.floor(Ys.length * 0.3); j < Math.floor(Ys.length * 0.8); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
+    if (!cnt) return;
+    ref[0] /= cnt; ref[1] /= cnt; ref[2] /= cnt;
+    const refY = 0.299 * ref[0] + 0.587 * ref[1] + 0.114 * ref[2];
+    const C = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
+    const r = Math.max(2, Math.round(0.012 * d.W));
+    const B = C.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
+    for (let i = 0; i < n; i++) {
+      const wf = R.wmap[i]; if (wf < 0.01) continue;
+      const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i];
+      if (Yb >= refY) continue;
+      const dark = (refY - Yb) / refY;
+      if (dark > 0.45) continue;                                // lashes / very dark: leave
+      const t = Math.min(1, d.amt * wf * Math.min(1, dark / 0.06));
+      for (let k = 0; k < 3; k++) {
+        const base = B[k][i] + t * (ref[k] - B[k][i]);          // new base colour
+        P[i * 4 + k] = Math.max(0, Math.min(255, base + (C[k][i] - B[k][i])));   // + original fine texture
+      }
+    }
+    ctx.putImageData(R.img, x0, y0);
+  }
+
   // CPU-only filters (also used by Live on small read-back areas).
   function cpuFilter(ctx, w, h, d) {
     if (d.t === 'W') wrinkleSmooth(ctx, w, h, d);
     else if (d.t === 'M') blemish(ctx, w, h, d);
+    else if (d.t === 'U') underEye(ctx, w, h, d);
   }
 
   function postFilters(ctx, w, h, list) {
     list.filter(d => d.t === 'W').forEach(d => wrinkleSmooth(ctx, w, h, d));
     list.filter(d => d.t === 'M').forEach(d => blemish(ctx, w, h, d));
+    list.filter(d => d.t === 'U').forEach(d => underEye(ctx, w, h, d));
     list.filter(d => d.t === 'G').forEach(d => glow(ctx, w, h, d));
   }
 
@@ -482,7 +522,7 @@
 
     const ALL = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
     const D = ALL.filter(d => d.t === 'b' || d.t === 'p' || d.t === 'L'), SHADE = ALL.filter(d => d.t === 'S');
-    const POST = ALL.filter(d => d.t === 'W' || d.t === 'G' || d.t === 'M');
+    const POST = ALL.filter(d => d.t === 'W' || d.t === 'G' || d.t === 'M' || d.t === 'U');
     if (!D.length) { shadeBalanced(ctx, w, h, SHADE); postFilters(ctx, w, h, POST); return out; }
 
     // Only process the region the deformations touch.

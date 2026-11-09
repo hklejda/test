@@ -192,7 +192,7 @@ void main() {
   }
 
   function pack(D0, W) {
-    const D = D0.filter(d => d.t !== 'W' && d.t !== 'M');   // CPU filters run in cpuPost()
+    const D = D0.filter(d => d.t !== 'W' && d.t !== 'M' && d.t !== 'U');   // CPU filters run in cpuPost()
     const n = Math.min(MAXD, D.length);
     U0.fill(0); U1.fill(0); U2.fill(0);
     for (let i = 0; i < n; i++) {
@@ -269,7 +269,7 @@ void main() {
           if (items.length) {
             const W = Math.hypot(smooth[234].x - smooth[454].x, smooth[234].y - smooth[454].y);
             const all = Warp.deforms(items, smooth);
-            lastW = all.filter(d => d.t === 'W' || d.t === 'M');
+            lastW = all.filter(d => d.t === 'W' || d.t === 'M' || d.t === 'U');
             n = pack(all, W);
           }
         }
