@@ -64,6 +64,11 @@
 
     const smoothArea = (c, rx, ry, amt) => out.push({ t: 'W', c, rx: rx * sv, ry, ang, amt: Math.min(0.9, 1.9 * amt * f * sv), W });   // normal dose ≈ lines gone (a hint kept = natural)
 
+    // Largest radius around c that stays inside the face outline (with a small margin).
+    const OVAL_PTS = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
+      152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109].map(P);
+    const edgeCap = (c, r) => Math.min(r, Math.max(0.05 * W, 0.92 * Math.min(...OVAL_PTS.map(q => dist(q, c)))));
+
     const lipW = dist(P(61), P(291)), lipH = Math.max(dist(P(0), P(17)), 0.06 * W);
     const mouth = mid(P(13), P(14));
     // Lip expansion: lips grow away from the line where they meet (stomion);
@@ -93,9 +98,10 @@
         // Volume on the cheek apples (nose level, below the cheekbone) with a gentle lift.
         // Nothing near the ears/eyes, no widening of the face.
         sides((sx, p) => {
-          bulge(p.apple, 0.16 * W, 0.15 * W, 0.34, 0.34);
-          push(off(p.apple, 0.02 * sx, 0.03), 0.18 * W, 0.17 * W, 0.008 * sx, -0.032);
-          push(p.contourLow, 0.09 * W, 0.11 * W, 0.018 * sx, -0.008);
+          // radius capped so nothing reaches the face outline (ears, earrings, hair stay put)
+          const r1 = edgeCap(p.apple, 0.16 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.18 * W);
+          bulge(p.apple, r1, r1 * 0.94, 0.34, 0.34);
+          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.008 * sx, -0.032);
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
           if (sv > 0.72) {     // skip on a strongly turned-away side (lighting there is unreliable)
             const k = sv * sv * sv;
