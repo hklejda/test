@@ -60,7 +60,7 @@ function scaler(f) {
 // These use the AI in photos when a fal key is set (best quality); in Live, and without a key, a filter.
 const WRINKLE = new Set(['glabella', 'crowsFeet', 'bunny', 'mentalis', 'nasolabial', 'marionette', 'tearTrough', 'eyeBright',
   'booster', 'laser', 'pigment', 'acne']);
-const wrinkleViaAI = id => WRINKLE.has(id) && !!store.get('fal_key');
+const wrinkleViaAI = () => false;   // no AI: everything runs locally, same as Live
 const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && (!Warp.isShape(id) || wrinkleViaAI(id))));
 // "Clear face" switch: a viewing filter added on top of the plan (no AI, works in Live).
 const clearOn = () => $('clearToggle').checked;
@@ -109,7 +109,7 @@ function renderTabs() {
   const wrap = $('catTabs');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id && (!state.live || liveOk(id))).length;
+    const count = [...state.plan.keys()].filter(id => byId[id].cat === c.id && liveOk(id)).length;
     const b = document.createElement('button');
     b.className = 'cat-tab' + (c.id === state.cat ? ' on' : '');
     b.setAttribute('role', 'tab');
@@ -121,7 +121,7 @@ function renderTabs() {
 }
 
 function renderAreaFilter() {
-  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat && (!state.live || liveOk(t.id))).map(t => t.area))];
+  const areas = ['All', ...new Set(TREATMENTS.filter(t => t.cat === state.cat && liveOk(t.id)).map(t => t.area))];
   const wrap = $('areaFilter');
   wrap.innerHTML = '';
   if (areas.length <= 2) return;
@@ -139,7 +139,7 @@ function renderGrid() {
   const grid = $('treatGrid');
   grid.innerHTML = '';
   const list = TREATMENTS.filter(t => t.cat === state.cat && (state.area === 'All' || t.area === state.area)
-    && (!state.live || liveOk(t.id)));                 // Live: only treatments that run without AI
+    && liveOk(t.id));                 // Live: only treatments that run without AI
   for (const t of list) grid.appendChild(card(t));
 }
 
@@ -150,7 +150,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? (LIVE_OK.has(t.id) ? 'AI · live filter' : 'AI') : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
+    <span class="t-range">${rangeText(t)} · ${Warp.isFilter(t.id) ? 'filter' : 'reshape'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';
@@ -199,7 +199,7 @@ function renderPlan() {
   const wrap = $('planList');
   wrap.innerHTML = '';
   for (const c of CATEGORIES) {
-    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id && (!state.live || liveOk(id)));
+    const items = [...state.plan].filter(([id]) => byId[id].cat === c.id && liveOk(id));
     if (!items.length) continue;
     const g = document.createElement('div');
     g.className = 'plan-group';
@@ -230,13 +230,36 @@ function renderStyles() {
     const b = document.createElement('button');
     b.textContent = s.name;
     if (s.id === state.style) b.className = 'on';
-    b.onclick = () => { state.style = s.id; renderStyles(); refreshPrompt(); };
+    b.onclick = () => { state.style = s.id; renderStyles(); refreshPrompt(); autoPreview(); };
     seg.appendChild(b);
   }
   $('styleHint').textContent = STYLES.find(s => s.id === state.style).hint;
 }
 
+// Upload works like Live: the result updates instantly whenever the plan changes.
+let previewTimer = 0;
+function autoPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    if (state.live || !state.photo || state.face !== 'ok' || !state.photoImg) return;
+    const items = shapeItems();
+    if (!items.length) {
+      state.versions = []; state.current = -1;
+      $('compare').hidden = true; $('singleImg').hidden = false;
+      ['downloadBtn', 'printBtn', 'viewToggle'].forEach(id => $(id).hidden = true);
+      updateUI();
+      return;
+    }
+    const out = Warp.apply(state.photoImg, state.faceL, items.map(([id, v]) => [id, byId[id] ? strength(byId[id], v) : 1]));
+    state.versions = [{ url: out.toDataURL('image/jpeg', 0.93), raw: null, protect: false, prompt: '', style: state.style,
+      model: 'local', plan: [...state.plan], time: new Date() }];
+    showVersion(0);
+    updateUI();
+  }, 120);
+}
+
 function changed() {
+  autoPreview();
   if (state.live) liveStatus('ok');
   renderBuilder();
   renderPlan();
@@ -260,12 +283,12 @@ function updateUI() {
   const any = state.plan.size || clearOn();
   $('applyBtn').disabled = !(state.photo && any && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
   $('applyHint').textContent =
-    !state.photo ? 'Add a client photo to start.' :
-    !any ? 'Select at least one treatment (or turn on Clear face).' :
+    !state.photo ? 'Upload a photo or use ● Live.' :
+    !any ? 'Select treatments — the preview updates instantly.' :
     needFace && state.face === 'loading' ? 'Mapping the face… one moment.' :
     needFace && state.face !== 'ok' ? 'Face not mapped — use a clear, front-facing photo.' :
     needAI && !key ? 'Add your fal API key in ⚙ Settings (needed for skin & line treatments).' :
-    !needAI ? 'Shape treatments only — no AI needed, instant and free.' : '';
+    '';
   $('areasBtn').disabled = !(state.face === 'ok' && state.plan.size);
   $('applyBtn').textContent = state.versions.length ? '✨ Generate new version' : '✨ Generate preview';
 }
@@ -330,7 +353,8 @@ async function mapFace(dataUrl) {
     if (state.photo !== dataUrl) return;
     if (!L) { setFaceStatus('missing', '⚠ No face found. Use a clear, front-facing photo.'); return; }
     state.faceL = L;
-    setFaceStatus('ok', '✓ Face mapped — only the selected areas will change');
+    setFaceStatus('ok', '✓ Face mapped — adjust treatments and the preview updates instantly');
+    autoPreview();
     if (state.autoGenerate) {                         // captured from Live: show the result right away
       state.autoGenerate = false;
       if (state.plan.size && !aiItems().length && !$('applyBtn').disabled) $('applyBtn').click();
@@ -361,7 +385,7 @@ function setAreas(on) {
 }
 $('areasBtn').addEventListener('click', () => setAreas(!state.showAreas));
 $('protectToggle').addEventListener('change', updateUI);
-$('clearToggle').addEventListener('change', () => { updateUI(); if (state.live) liveStatus('ok'); });
+$('clearToggle').addEventListener('change', () => { updateUI(); autoPreview(); if (state.live) liveStatus('ok'); });
 
 $('fileInput').addEventListener('change', e => {
   const file = e.target.files?.[0];
@@ -434,9 +458,10 @@ function showVersion(i) {
   $('afterImg').src = v.url;
   $('rawViewBtn').hidden = !(v.protect && v.raw);
   $('singleImg').hidden = true;
+  const wasShown = !$('compare').hidden;
   $('compare').hidden = false;
   setView(state.view);
-  setSplit(50); $('compareRange').value = 50;
+  if (!wasShown) { setSplit(50); $('compareRange').value = 50; }
   $('downloadBtn').href = v.url;
   ['downloadBtn', 'printBtn', 'viewToggle'].forEach(id => $(id).hidden = false);
   setAreas(false);
@@ -738,11 +763,11 @@ $('liveCaptureBtn').addEventListener('click', () => {
   const treated = mirror(Live.renderedFrame());
   const before = resizeToDataURL(raw, raw.width, raw.height);
   const after = resizeToDataURL(treated, treated.width, treated.height);
-  const plan = liveItems();
+  const plan = liveItems().filter(([id]) => byId[id]);   // real treatments only (not the Clear face view)
   stopLive(false);
   state.autoGenerate = false;
   setPhoto(before);
-  if (plan.length) {
+  if (plan.length || clearOn()) {
     state.versions.push({ url: after, raw: null, protect: false, prompt: '', style: state.style, model: 'live',
       plan, time: new Date() });
     showVersion(state.versions.length - 1);

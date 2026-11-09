@@ -7,7 +7,7 @@ Live: https://hklejda.github.io/test/
 ## Features
 
 - **Live preview (Snapchat-style):** real-time reshaping on the camera with face tracking (WebGL2). Adjust doses while watching, hold to see before, capture to continue with AI skin treatments and the report.
-- **Photo:** camera with face guide, or upload
+- **Upload:** same treatments as Live, all without AI; the result updates instantly as you change treatments or doses
 - **Treatment categories**
   - **Dermal fillers (mL):** lips, cheeks, chin, jawline, nasolabial, marionette, tear troughs
   - **Botox (units):** forehead, glabella, crow's feet, brow lift, bunny lines, lip flip, gummy smile, masseter, chin dimpling, neck (Nefertiti)
