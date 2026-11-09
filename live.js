@@ -126,9 +126,9 @@ void main() {
       vec3 cb = textureLod(tex, tuv, c.x).rgb;
       float Yv = lum(col), Yb = max(lum(cb), 0.004);
       float sm = 0.45 * b.z * max(0.0, 1.0 - abs(Yv - Yb) / Yb / 0.1);
-      float gm = 1.0 - 0.16 * b.z;
+      float gm = 1.0 - 0.16 * b.z * b.w;                 // b.w = brightening share (0 = smoothing only)
       vec3 v = mix(pow(col, vec3(gm)), pow(cb, vec3(gm)), sm);
-      v *= vec3(1.0 + 0.015 * b.z, 1.0, 1.0 - 0.015 * b.z);
+      v *= vec3(1.0 + 0.015 * b.z * b.w, 1.0, 1.0 - 0.015 * b.z * b.w);
       col = min(mix(col, v, w), vec3(1.0));
     }
   }
@@ -192,7 +192,7 @@ void main() {
   }
 
   function pack(D0, W) {
-    const D = D0.filter(d => d.t !== 'W');
+    const D = D0.filter(d => d.t !== 'W' && d.t !== 'M');   // CPU filters run in cpuPost()
     const n = Math.min(MAXD, D.length);
     U0.fill(0); U1.fill(0); U2.fill(0);
     for (let i = 0; i < n; i++) {
@@ -212,7 +212,7 @@ void main() {
         const rb = 0.032 * W;   // same scales as the photo version (warp.js)
         U2.set([Math.log2(Math.max(1, 0.006 * W)), rb, Math.log2(Math.max(1, rb / 2.5)), 0], j);
       } else if (d.t === 'G') {
-        U0.set([5, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
+        U0.set([5, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, d.bright ?? 1], j);
         U2.set([Math.log2(Math.max(1, 0.016 * W)), 0, 0, 0], j);
       }
     }
@@ -242,7 +242,7 @@ void main() {
       const img = sctx.createImageData(bw, bh);
       for (let y = 0; y < bh; y++) img.data.set(buf.subarray((bh - 1 - y) * bw * 4, (bh - y) * bw * 4), y * bw * 4);
       sctx.putImageData(img, x0, y0);
-      Warp.wrinkleSmooth(sctx, w, h, d);
+      Warp.cpuFilter(sctx, w, h, d);
       octx.drawImage(scratch, x0, y0, bw, bh, x0, y0, bw, bh);
     }
   }
@@ -269,7 +269,7 @@ void main() {
           if (items.length) {
             const W = Math.hypot(smooth[234].x - smooth[454].x, smooth[234].y - smooth[454].y);
             const all = Warp.deforms(items, smooth);
-            lastW = all.filter(d => d.t === 'W');
+            lastW = all.filter(d => d.t === 'W' || d.t === 'M');
             n = pack(all, W);
           }
         }

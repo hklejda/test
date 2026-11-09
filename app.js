@@ -57,12 +57,15 @@ function scaler(f) {
 }
 
 // Wrinkle treatments: AI in photos (cleanest result), fast filter in Live (and as fallback without a key).
-const WRINKLE = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis']);
+// These use the AI in photos when a fal key is set (best quality); in Live, and without a key, a filter.
+const WRINKLE = new Set(['glabella', 'crowsFeet', 'bunny', 'mentalis', 'nasolabial', 'marionette', 'tearTrough', 'eyeBright',
+  'booster', 'laser', 'pigment', 'acne']);
 const wrinkleViaAI = id => WRINKLE.has(id) && !!store.get('fal_key');
 const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && (!Warp.isShape(id) || wrinkleViaAI(id))));
 const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id) && !wrinkleViaAI(id));
 // Live shows only treatments with a clear, real effect without AI.
-const LIVE_OK = new Set(['lips', 'cheeks', 'chin', 'jawline', 'browLift', 'lipFlip', 'masseter', 'brighten']);
+const LIVE_OK = new Set(['lips', 'cheeks', 'chin', 'jawline', 'browLift', 'lipFlip', 'masseter', 'gummy', 'brighten',
+  'nasolabial', 'marionette', 'tearTrough', 'eyeBright', 'booster', 'laser', 'pigment']);   // acne: too weak without AI
 const liveOk = id => LIVE_OK.has(id);
 const liveItems = () => [...state.plan].filter(([id]) => liveOk(id));
 
@@ -144,7 +147,7 @@ function card(t) {
   el.innerHTML = `
     <div class="t-top"><span class="t-name">${t.name}</span><span class="t-check">${on ? '✓' : ''}</span></div>
     <span class="t-desc">${t.desc}</span>
-    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? 'AI' : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
+    <span class="t-range">${rangeText(t)} · ${WRINKLE.has(t.id) ? (LIVE_OK.has(t.id) ? 'AI · live filter' : 'AI') : Warp.isFilter(t.id) ? 'filter · no AI' : Warp.isShape(t.id) ? 'reshape · no AI' : 'AI'}</span>`;
   if (on) {
     el.querySelector('.t-top').onclick = () => toggle(t.id);
     el.querySelector('.t-check').title = 'Remove';

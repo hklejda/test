@@ -40,9 +40,6 @@ const TREATMENTS = [
     prompt: k => `UNDER-EYE HOLLOWS — fill the hollows and grooves under both eyes, reducing them by about ${k(85)}%: a smooth, flat transition from the lower eyelid to the cheek, with fewer shadows. Don't change the eyes themselves.` },
 
   // ---------- Botulinum toxin ----------
-  { id: 'forehead', cat: 'botox', name: 'Forehead lines', area: 'Upper face', type: 'dose', min: 6, max: 20, step: 2, def: 10,
-    desc: 'Smooth horizontal lines',
-    prompt: k => `FOREHEAD — remove about ${k(90)}% of the horizontal forehead wrinkles, so the forehead skin looks smooth and relaxed.` },
   { id: 'glabella', cat: 'botox', name: 'Frown lines (glabella)', area: 'Upper face', type: 'dose', min: 10, max: 30, step: 5, def: 20,
     desc: '"11" lines between the brows',
     prompt: k => `FROWN LINES — remove about ${k(90)}% of the vertical "11" wrinkles between the eyebrows, so that area is smooth.` },

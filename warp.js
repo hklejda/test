@@ -14,10 +14,20 @@
   const SHAPE = new Set([
     'lips', 'cheeks', 'chin', 'jawline',
     'browLift', 'lipFlip', 'gummy', 'masseter',
-    'forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis',    // wrinkle smoothing filter
+    'glabella', 'crowsFeet', 'bunny', 'mentalis',                 // wrinkle smoothing filter
+    'nasolabial', 'marionette', 'tearTrough', 'eyeBright',       // shadow fill (folds, under-eyes)
+    'booster', 'laser', 'pigment', 'acne',                        // skin filters
     'brighten',                                                   // beauty filter
   ]);
-  const FILTER = new Set(['forehead', 'glabella', 'crowsFeet', 'bunny', 'mentalis', 'brighten']);
+  const FILTER = new Set(['glabella', 'crowsFeet', 'bunny', 'mentalis', 'nasolabial', 'marionette', 'tearTrough', 'eyeBright',
+    'booster', 'laser', 'pigment', 'acne', 'brighten']);
+  const OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
+    152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+  const LIPS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
+  const R_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
+  const L_EYE = [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466];
+  const R_BROW = [46, 53, 52, 65, 55, 107, 66, 105, 63, 70];
+  const L_BROW = [276, 283, 282, 295, 285, 336, 296, 334, 293, 300];
 
   const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -95,19 +105,48 @@
         });
         break;
       // ---- Wrinkle smoothing (no AI): lift thin dark creases toward the surrounding skin ----
-      case 'forehead': {
-        // exact forehead: just above the brows up past the hairline landmarks, temple to temple
-        const bottom = [70, 63, 105, 66, 107, 336, 296, 334, 293, 300].map(i => off(P(i), 0, -0.025));
-        const top = [284, 332, 297, 338, 10, 109, 67, 103, 54].map(i => off(P(i), 0, -0.1));
-        out.push({ t: 'W', poly: [...bottom, ...top], c: off(P(151), 0, -0.06), rx: 0.4 * W, ry: 0.2 * W, ang, amt: Math.min(0.9, 1.9 * 0.9 * f), W });
-        break;
-      }
       case 'glabella':  smoothArea(off(P(9), 0, -0.005), 0.085 * W, 0.085 * W, 0.9); break;
       case 'crowsFeet': sides(sx => smoothArea(off(P(sx < 0 ? 33 : 263), 0.075 * sx, 0.01), 0.065 * W, 0.075 * W, 0.85)); break;
       case 'bunny':     sides(sx => smoothArea(off(P(6), 0.045 * sx, 0.03), 0.045 * W, 0.055 * W, 0.9)); break;
       case 'mentalis':  smoothArea(off(P(152), 0, -0.06), 0.13 * W, 0.09 * W, 0.85); break;
       // ---- Beauty filter: brighter, softer, slightly warm face ----
-      case 'brighten':  out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.2, 0.9 * f), W }); break;
+      case 'brighten':  out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.2, 0.9 * f), bright: 1, W }); break;
+      case 'booster':   out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.2, 0.8 * f), bright: 0.35, W }); break;
+      case 'laser':     out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.4, 1.15 * f), bright: 0, W }); break;
+
+      // ---- Folds & under-eyes (no AI): fill the shadow of the fold toward the skin around it ----
+      case 'nasolabial':
+        sides(sx => {
+          const a = P(sx < 0 ? 129 : 358), m = P(sx < 0 ? 61 : 291), len = dist(a, m);
+          out.push({ t: 'S', grp: 'naso', c: off(mid(a, m), 0.012 * sx, 0.012), rx: len * 0.62 + 0.015 * W, ry: 0.038 * W * sv,
+            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1.6, 1.3 * f * sv), W, vis: sv });
+        });
+        break;
+      case 'marionette':
+        sides(sx => {
+          const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.035 * sx, 0.15), len = dist(a, b2);
+          out.push({ t: 'S', grp: 'mario', c: off(mid(a, b2), 0, 0.01), rx: len * 0.6, ry: 0.034 * W * sv,
+            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1.6, 1.3 * f * sv), W, vis: sv });
+        });
+        break;
+      case 'tearTrough':
+      case 'eyeBright':
+        sides(sx => {
+          const k = id === 'eyeBright' ? 1.5 : 1.25;
+          out.push({ t: 'S', grp: id, c: off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.058), rx: 0.1 * W * sv, ry: 0.045 * W, ang,
+            amt: Math.min(1.8, k * f * sv), W, vis: sv });
+        });
+        break;
+
+      // ---- Pigmentation & acne (no AI): lighten small dark spots; acne also calms redness ----
+      case 'pigment':
+      case 'acne': {
+        const cut = [LIPS.map(P), R_EYE.map(P), L_EYE.map(P)].map(poly => ({ poly, grow: 0.03 * W }))
+          .concat([R_BROW.map(P), L_BROW.map(P)].map(poly => ({ poly, grow: 0.03 * W, line: true })));
+        out.push({ t: 'M', poly: OVAL.map(P), cut, c: P(5), rx: 0.6 * W, ry: 0.8 * W, ang, W,
+          amt: Math.min(1, (id === 'acne' ? 0.9 : 1) * f), red: id === 'acne', scale: id === 'pigment' ? 0.02 : 0.012 });
+        break;
+      }
 
       case 'chin':
         push(off(P(152), 0, -0.04), 0.17 * W, 0.14 * W, 0, 0.035);
@@ -282,6 +321,16 @@
       mc.filter = `blur(${feather}px)`;
       mc.fillStyle = '#fff';
       mc.beginPath(); d.poly.forEach((q, i) => (i ? mc.lineTo(q.x - x0, q.y - y0) : mc.moveTo(q.x - x0, q.y - y0))); mc.closePath(); mc.fill();
+      if (d.cut) {                                    // keep eyes, brows, lips out of the area
+        mc.globalCompositeOperation = 'destination-out';
+        mc.strokeStyle = '#fff'; mc.lineJoin = 'round'; mc.lineCap = 'round';
+        for (const c of d.cut) {
+          mc.beginPath(); c.poly.forEach((q, i) => (i ? mc.lineTo(q.x - x0, q.y - y0) : mc.moveTo(q.x - x0, q.y - y0)));
+          if (!c.line) { mc.closePath(); mc.fill(); }
+          mc.lineWidth = c.grow * 2; mc.stroke();
+        }
+        mc.globalCompositeOperation = 'source-over';
+      }
       const md = mc.getImageData(0, 0, bw, bh).data;
       wmap = new Float32Array(bw * bh);
       for (let i = 0; i < bw * bh; i++) wmap[i] = md[i * 4 + 3] / 255;
@@ -323,7 +372,7 @@
     const ch = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
     const r = Math.max(1, Math.round(0.008 * d.W));
     const B = ch.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
-    const gamma = 1 - 0.16 * d.amt, warm = 0.015 * d.amt;
+    const br = d.bright ?? 1, gamma = 1 - 0.16 * d.amt * br, warm = 0.015 * d.amt * br;
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const s2 = R.s2(x, y); if (s2 >= 1) continue;
       const t = Math.min(1, Math.max(0, (1 - Math.sqrt(s2)) / 0.45)), wgt = t * t * (3 - 2 * t);
@@ -341,8 +390,43 @@
     ctx.putImageData(R.img, R.x0, R.y0);
   }
 
+  // Pigmentation / acne: lighten small dark spots toward the skin around them (frequency-band,
+  // protected against eyes/brows by the area mask and a darkness limit); acne also pulls
+  // local redness (red minus the local average red) back toward the surrounding skin tone.
+  function blemish(ctx, w, h, d) {
+    const R = region(ctx, w, h, d); if (!R || !R.wmap) return;
+    const { bw, bh, P } = R, n = bw * bh;
+    const ch = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
+    const r = Math.max(2, Math.round(d.scale * d.W));
+    const B = ch.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
+    for (let i = 0; i < n; i++) {
+      const wf = R.wmap[i]; if (wf < 0.01) continue;
+      let rr = ch[0][i], gg = ch[1][i], bb = ch[2][i];
+      const Y = 0.299 * rr + 0.587 * gg + 0.114 * bb, Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i];
+      if (Y < 2 || Yb < 2) continue;
+      if (Y < Yb) {                                         // darker spot → lift toward local skin level
+        const dd = (Yb - Y) / Yb, k = Math.min(1, Math.max(0, (0.32 - dd) / 0.14));
+        const g = (Y + d.amt * wf * k * (Yb - Y)) / Y;
+        rr *= g; gg *= g; bb *= g;
+      }
+      if (d.red) {                                          // redness → toward local tone
+        const ex = (rr - (gg + bb) / 2) - (B[0][i] - (B[1][i] + B[2][i]) / 2);
+        if (ex > 0) { const t = d.amt * wf * ex * 0.75; rr -= t; gg += t * 0.35; bb += t * 0.25; }
+      }
+      P[i * 4] = Math.max(0, Math.min(255, rr)); P[i * 4 + 1] = Math.max(0, Math.min(255, gg)); P[i * 4 + 2] = Math.max(0, Math.min(255, bb));
+    }
+    ctx.putImageData(R.img, R.x0, R.y0);
+  }
+
+  // CPU-only filters (also used by Live on small read-back areas).
+  function cpuFilter(ctx, w, h, d) {
+    if (d.t === 'W') wrinkleSmooth(ctx, w, h, d);
+    else if (d.t === 'M') blemish(ctx, w, h, d);
+  }
+
   function postFilters(ctx, w, h, list) {
     list.filter(d => d.t === 'W').forEach(d => wrinkleSmooth(ctx, w, h, d));
+    list.filter(d => d.t === 'M').forEach(d => blemish(ctx, w, h, d));
     list.filter(d => d.t === 'G').forEach(d => glow(ctx, w, h, d));
   }
 
@@ -371,7 +455,7 @@
 
     const ALL = items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
     const D = ALL.filter(d => d.t === 'b' || d.t === 'p' || d.t === 'L'), SHADE = ALL.filter(d => d.t === 'S');
-    const POST = ALL.filter(d => d.t === 'W' || d.t === 'G');
+    const POST = ALL.filter(d => d.t === 'W' || d.t === 'G' || d.t === 'M');
     if (!D.length) { shadeBalanced(ctx, w, h, SHADE); postFilters(ctx, w, h, POST); return out; }
 
     // Only process the region the deformations touch.
@@ -444,5 +528,5 @@
   // All deformations for a plan (used by the live WebGL renderer).
   const build = (items, L) => items.flatMap(([id, f]) => (SHAPE.has(id) ? deforms(id, f, L) : []));
 
-  window.Warp = { isShape: id => SHAPE.has(id), isFilter: id => FILTER.has(id), apply, deforms: build, wrinkleSmooth };
+  window.Warp = { isShape: id => SHAPE.has(id), isFilter: id => FILTER.has(id), apply, deforms: build, wrinkleSmooth, cpuFilter };
 })();
