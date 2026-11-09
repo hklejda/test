@@ -159,14 +159,10 @@
         break;
 
       // ---- Pigmentation & acne (no AI): lighten small dark spots; acne also calms redness ----
-      case 'clearFace': {
-        // "Clear face" view: smoother, clearer, slightly brighter skin (eyes, brows, lips kept sharp).
-        out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: 0.85, bright: 0.45, W });
-        const cut = [LIPS.map(P), R_EYE.map(P), L_EYE.map(P)].map(poly => ({ poly, grow: 0.03 * W }))
-          .concat([R_BROW.map(P), L_BROW.map(P)].map(poly => ({ poly, grow: 0.03 * W, line: true })));
-        out.push({ t: 'M', poly: OVAL.map(P), cut, c: P(5), rx: 0.6 * W, ry: 0.8 * W, ang, W, amt: 0.85, red: true, scale: 0.014 });
+      case 'clearFace':
+        // Clear face: brighter, fresher skin only — no smoothing/blur, details stay sharp.
+        out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: 1.0, bright: 1, soft: 0, W });
         break;
-      }
       case 'pigment':
       case 'acne': {
         const cut = [LIPS.map(P), R_EYE.map(P), L_EYE.map(P)].map(poly => ({ poly, grow: 0.03 * W }))
@@ -410,7 +406,7 @@
       const i = y * bw + x;
       const Yv = 0.299 * ch[0][i] + 0.587 * ch[1][i] + 0.114 * ch[2][i];
       const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i] || 1;
-      const sm = 0.45 * d.amt * Math.max(0, 1 - Math.abs(Yv - Yb) / Yb / 0.1);   // smooth skin, keep edges
+      const sm = (d.soft ?? 1) * 0.45 * d.amt * Math.max(0, 1 - Math.abs(Yv - Yb) / Yb / 0.1);   // smooth skin, keep edges
       for (let k = 0; k < 3; k++) {
         const c = ch[k][i] / 255, cb = B[k][i] / 255;
         let v = Math.pow(c, gamma) * (1 - sm) + Math.pow(cb, gamma) * sm;

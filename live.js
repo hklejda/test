@@ -125,7 +125,7 @@ void main() {
       float t = clamp((1.0 - sqrt(s2)) / 0.45, 0.0, 1.0), w = t * t * (3.0 - 2.0 * t);
       vec3 cb = textureLod(tex, tuv, c.x).rgb;
       float Yv = lum(col), Yb = max(lum(cb), 0.004);
-      float sm = 0.45 * b.z * max(0.0, 1.0 - abs(Yv - Yb) / Yb / 0.1);
+      float sm = c.y * 0.45 * b.z * max(0.0, 1.0 - abs(Yv - Yb) / Yb / 0.1);   // c.y = smoothing share
       float gm = 1.0 - 0.16 * b.z * b.w;                 // b.w = brightening share (0 = smoothing only)
       vec3 v = mix(pow(col, vec3(gm)), pow(cb, vec3(gm)), sm);
       v *= vec3(1.0 + 0.015 * b.z * b.w, 1.0, 1.0 - 0.015 * b.z * b.w);
@@ -213,7 +213,7 @@ void main() {
         U2.set([Math.log2(Math.max(1, 0.006 * W)), rb, Math.log2(Math.max(1, rb / 2.5)), 0], j);
       } else if (d.t === 'G') {
         U0.set([5, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, d.bright ?? 1], j);
-        U2.set([Math.log2(Math.max(1, 0.016 * W)), 0, 0, 0], j);
+        U2.set([Math.log2(Math.max(1, 0.016 * W)), d.soft ?? 1, 0, 0], j);
       }
     }
     return n;
