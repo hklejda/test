@@ -115,26 +115,31 @@
       case 'laser':     out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: Math.min(1.4, 1.15 * f), bright: 0, W }); break;
 
       // ---- Folds & under-eyes (no AI): fill the shadow of the fold toward the skin around it ----
+      // ---- Folds & under-eyes (no AI): even out the fold — the dark groove gets lighter AND the
+      //      bulge beside it (cheek fold / under-eye bag) gets flatter, so the line disappears
+      //      instead of being lit up. Fold-sized frequency band, texture and overall light kept.
       case 'nasolabial':
         sides(sx => {
           const a = P(sx < 0 ? 129 : 358), m = P(sx < 0 ? 61 : 291), len = dist(a, m);
-          out.push({ t: 'S', grp: 'naso', c: off(mid(a, m), 0.012 * sx, 0.012), rx: len * 0.62 + 0.015 * W, ry: 0.038 * W * sv,
-            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1.6, 1.3 * f * sv), W, vis: sv });
+          out.push({ t: 'W', c: off(mid(a, m), 0.014 * sx, 0.012), rx: len * 0.62 + 0.02 * W, ry: 0.055 * W * sv,
+            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1, 2.0 * f * sv), W, rs: 0.008, rb: 0.06, darkOnly: true });
         });
         break;
       case 'marionette':
         sides(sx => {
-          const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.035 * sx, 0.15), len = dist(a, b2);
-          out.push({ t: 'S', grp: 'mario', c: off(mid(a, b2), 0, 0.01), rx: len * 0.6, ry: 0.034 * W * sv,
-            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1.6, 1.3 * f * sv), W, vis: sv });
+          const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.035 * sx, 0.16), len = dist(a, b2);
+          out.push({ t: 'W', c: off(mid(a, b2), 0.004 * sx, 0.01), rx: len * 0.62, ry: 0.05 * W * sv,
+            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1, 2.0 * f * sv), W, rs: 0.008, rb: 0.055, darkOnly: true });
         });
         break;
       case 'tearTrough':
+        sides(sx => out.push({ t: 'W', c: off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.062), rx: 0.11 * W * sv, ry: 0.055 * W, ang,
+          amt: Math.min(1, 2.0 * f * sv), W, rs: 0.007, rb: 0.05, darkOnly: true }));
+        break;
       case 'eyeBright':
         sides(sx => {
-          const k = id === 'eyeBright' ? 1.5 : 1.25;
           out.push({ t: 'S', grp: id, c: off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.058), rx: 0.1 * W * sv, ry: 0.045 * W, ang,
-            amt: Math.min(1.8, k * f * sv), W, vis: sv });
+            amt: Math.min(1.8, 1.5 * f * sv), W, vis: sv });
         });
         break;
 
@@ -347,7 +352,7 @@
     const R = region(ctx, w, h, d, 1.15); if (!R) return;
     const { bw, bh, P } = R, n = bw * bh, Y = new Float32Array(n);
     for (let i = 0; i < n; i++) Y[i] = 0.299 * P[i * 4] + 0.587 * P[i * 4 + 1] + 0.114 * P[i * 4 + 2];
-    const rs = Math.max(1, Math.round(0.0045 * d.W)), rb = Math.max(2, Math.round(0.045 * d.W));   // keep pores/texture, catch wide deep lines
+    const rs = Math.max(1, Math.round((d.rs || 0.0045) * d.W)), rb = Math.max(2, Math.round((d.rb || 0.045) * d.W));   // keep pores/texture, catch wide deep lines
     const Ys = boxBlur(Y, bw, bh, rs), Yb = boxBlur(boxBlur(Y, bw, bh, rb), bw, bh, rb);
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const i = y * bw + x;
@@ -357,6 +362,7 @@
       const yy = Y[i];
       if (yy < 2 || Yb[i] < 2) continue;
       const band = Ys[i] - Yb[i], rel = Math.abs(band) / Yb[i];
+      if (d.darkOnly && band >= 0) continue;                 // folds: only lift the groove, never darken the skin beside it
       const k = Math.min(1, Math.max(0, (0.48 - rel) / 0.18));
       if (!k) continue;
       const g = Math.max(0.6, (yy - d.amt * wf * k * band) / yy);

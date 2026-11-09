@@ -721,12 +721,28 @@ function stopLive(restoreView = true) {
 
 $('liveBtn').addEventListener('click', startLive);
 $('liveExitBtn').addEventListener('click', () => stopLive());
+// Capture saves exactly what the client sees (treated) as the result, and the untreated
+// frame as "before", so compare, download and report work straight away.
 $('liveCaptureBtn').addEventListener('click', () => {
-  const frame = Live.captureFrame();
-  const data = resizeToDataURL(frame, frame.width, frame.height);
+  const mirror = src => {
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const x = c.getContext('2d'); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(src, 0, 0);
+    return c;
+  };
+  const raw = Live.captureFrame();                       // already mirrored like the preview
+  const treated = mirror(Live.renderedFrame());
+  const before = resizeToDataURL(raw, raw.width, raw.height);
+  const after = resizeToDataURL(treated, treated.width, treated.height);
+  const plan = liveItems();
   stopLive(false);
-  state.autoGenerate = true;
-  setPhoto(data);
+  state.autoGenerate = false;
+  setPhoto(before);
+  if (plan.length) {
+    state.versions.push({ url: after, raw: null, protect: false, prompt: '', style: state.style, model: 'live',
+      plan, time: new Date() });
+    showVersion(state.versions.length - 1);
+  }
+  updateUI();
 });
 const hold = on => { Live.setBypass(on); $('liveHoldBtn').classList.toggle('on', on); $('liveHoldBtn').textContent = on ? 'Before (release for after)' : 'Hold to see before'; };
 $('liveHoldBtn').addEventListener('pointerdown', e => { e.preventDefault(); hold(true); });
