@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=202611091157" />
+  <link rel="stylesheet" href="style.css?v=202611091158" />
 </head>
 <body>
   <header class="top">
@@ -77,7 +77,7 @@
       </div>
 
       <p id="faceStatus" class="face-status" hidden></p>
-      <p id="liveNote" class="hint" hidden>Live shows every treatment with a real effect without AI in real time — fillers, folds, under-eyes, brow lift, lip flip, jaw slimming, gummy smile and skin filters. Adjust doses while watching; after capture, AI can refine skin &amp; fold treatments. Adjust doses on the right while watching. AI treatments are hidden in Live.</p>
+      <p id="liveNote" class="hint" hidden>Live shows every treatment with a real effect without AI in real time — fillers, folds, under-eyes, brow lift, lip flip, jaw slimming and gummy smile — plus the Clear face switch. Adjust doses while watching; after capture, AI can refine skin &amp; fold treatments. Adjust doses on the right while watching. AI treatments are hidden in Live.</p>
 
       <div class="row stage-actions">
         <button id="liveCaptureBtn" class="primary" hidden>📸 Capture</button>
@@ -134,6 +134,14 @@
 
         <div class="protect">
           <label class="switch">
+            <input id="clearToggle" type="checkbox" />
+            <span class="track"></span>
+            <span><strong>✨ Clear face</strong><br /><span class="hint">Smoother, clearer skin — just for viewing (no AI, works in Live)</span></span>
+          </label>
+        </div>
+
+        <div class="protect">
+          <label class="switch">
             <input id="protectToggle" type="checkbox" checked />
             <span class="track"></span>
             <span><strong>Change only selected areas</strong><br /><span class="hint">Everything else stays exactly as in the original photo</span></span>
@@ -165,7 +173,7 @@
 
   <footer class="foot">
     AI visualization for consultation purposes only. Not a medical result or a guarantee of outcome. Doses shown are general reference ranges; treatment must be decided by a qualified practitioner.
-    <span class="ver">· version 202611091157</span>
+    <span class="ver">· version 202611091158</span>
   </footer>
 
   <!-- ============ Print report ============ -->
@@ -216,10 +224,10 @@
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611091157"></script>
-  <script src="face.js?v=202611091157"></script>
-  <script src="live.js?v=202611091157"></script>
-  <script src="warp.js?v=202611091157"></script>
-  <script src="app.js?v=202611091157"></script>
+  <script src="data.js?v=202611091158"></script>
+  <script src="face.js?v=202611091158"></script>
+  <script src="live.js?v=202611091158"></script>
+  <script src="warp.js?v=202611091158"></script>
+  <script src="app.js?v=202611091158"></script>
 </body>
 </html>

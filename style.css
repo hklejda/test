@@ -160,7 +160,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .history-strip span { position: absolute; bottom: 2px; left: 4px; font-size: .65rem; color: #fff; text-shadow: 0 1px 2px #000; }
 
 /* ---------- Treatment builder ---------- */
-.cat-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cat-tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .cat-tab {
   border: 1px solid var(--line); background: var(--bg); border-radius: 14px; padding: 10px 8px; cursor: pointer;
   display: grid; justify-items: center; gap: 2px; position: relative;

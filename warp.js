@@ -17,7 +17,7 @@
     'glabella', 'crowsFeet', 'bunny', 'mentalis',                 // wrinkle smoothing filter
     'nasolabial', 'marionette', 'tearTrough', 'eyeBright',       // shadow fill (folds, under-eyes)
     'booster', 'laser', 'pigment', 'acne',                        // skin filters
-    'brighten',                                                   // beauty filter
+    'brighten', 'clearFace',                                      // beauty filters
   ]);
   const FILTER = new Set(['glabella', 'crowsFeet', 'bunny', 'mentalis', 'nasolabial', 'marionette', 'tearTrough', 'eyeBright',
     'booster', 'laser', 'pigment', 'acne', 'brighten']);
@@ -144,6 +144,14 @@
         break;
 
       // ---- Pigmentation & acne (no AI): lighten small dark spots; acne also calms redness ----
+      case 'clearFace': {
+        // "Clear face" view: smoother, clearer, slightly brighter skin (eyes, brows, lips kept sharp).
+        out.push({ t: 'G', c: off(P(5), 0, -0.06), rx: 0.62 * W, ry: 0.85 * W, ang, amt: 0.85, bright: 0.45, W });
+        const cut = [LIPS.map(P), R_EYE.map(P), L_EYE.map(P)].map(poly => ({ poly, grow: 0.03 * W }))
+          .concat([R_BROW.map(P), L_BROW.map(P)].map(poly => ({ poly, grow: 0.03 * W, line: true })));
+        out.push({ t: 'M', poly: OVAL.map(P), cut, c: P(5), rx: 0.6 * W, ry: 0.8 * W, ang, W, amt: 0.85, red: true, scale: 0.014 });
+        break;
+      }
       case 'pigment':
       case 'acne': {
         const cut = [LIPS.map(P), R_EYE.map(P), L_EYE.map(P)].map(poly => ({ poly, grow: 0.03 * W }))

@@ -11,7 +11,6 @@ Live: https://hklejda.github.io/test/
 - **Treatment categories**
   - **Dermal fillers (mL):** lips, cheeks, chin, jawline, nasolabial, marionette, tear troughs
   - **Botox (units):** forehead, glabella, crow's feet, brow lift, bunny lines, lip flip, gummy smile, masseter, chin dimpling, neck (Nefertiti)
-  - **Skin:** skin booster, laser resurfacing, pigmentation, acne scars, eye brightening, face brightening (filter)
 - Filter by face area, adjust dose or intensity per treatment
 - **Result style:** Natural / Balanced / Enhanced
 - Treatment plan summary with total filler mL and botox units
@@ -19,6 +18,7 @@ Live: https://hklejda.github.io/test/
 - Version history for comparing plans
 - Printable report (before/after and plan table) → save as PDF
 - **Precise reshaping for shape treatments:** fillers (lips, cheeks, chin, jawline), brow lift, lip flip, gummy smile, jaw slimming are done by landmark-driven warping (`warp.js`), not AI. Amount scales with the dose. Instant, free, no lighting artefacts.
+- **✨ Clear face switch:** smoother, clearer, slightly brighter skin for viewing (no AI, works in Live).
 - **Live / no-AI versions:** nasolabial & marionette folds and tear troughs/dark circles (shadow fill), skin booster & laser (edge-aware smoothing), pigmentation (spot lightening). In photos these use the AI when a fal key is set.
 - **No-AI filters:** wrinkle smoothing for frown lines, crow's feet, bunny lines and chin dimpling (frequency separation — removes wrinkle-sized shading, keeps pores), and a face-brightening beauty filter. Both also run live.
 - **AI for skin & line treatments:** acne, pigmentation, laser, booster, dark circles, wrinkles (botox lines), nasolabial/marionette lines, tear troughs.

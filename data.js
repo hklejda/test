@@ -10,7 +10,6 @@
 const CATEGORIES = [
   { id: 'filler',  name: 'Dermal Fillers',  short: 'Fillers',    icon: '💧', unit: 'mL', blurb: 'Hyaluronic acid, mL per session (both sides for paired areas)' },
   { id: 'botox',   name: 'Botulinum Toxin', short: 'Botox',      icon: '✦',  unit: 'U',  blurb: 'Units of onabotulinumtoxinA (Botox®), total for the area' },
-  { id: 'skin',    name: 'Skin Treatments', short: 'Skin',       icon: '✧',  unit: null, blurb: 'Skin quality, scars, pigmentation and firmness' },
 ];
 
 const LEVELS = ['', 'Light', 'Medium', 'Intensive'];
@@ -68,25 +67,6 @@ const TREATMENTS = [
     desc: 'Smoother neck, sharper jaw line',
     prompt: k => `NECK — soften the vertical neck bands by about ${k(75)}% and make the jawline look crisper and more lifted.` },
 
-  // ---------- Skin treatments ----------
-  { id: 'booster', cat: 'skin', name: 'Skin booster', area: 'Full face', type: 'level', def: 2,
-    desc: 'Hydration and healthy glow',
-    prompt: k => `SKIN QUALITY (skin booster) — improve skin quality by about ${k(55, 75)}%: smoother, more even and more hydrated-looking skin, softer fine lines and smaller pores. Natural MATTE finish: no shine, no oily or glossy look, no glow effect. Keep the same skin tone and brightness.` },
-  { id: 'laser', cat: 'skin', name: 'Laser resurfacing', area: 'Full face', type: 'level', def: 2,
-    desc: 'Fine lines and texture',
-    prompt: k => `RESURFACING — remove about ${k(75)}% of fine lines, wrinkles and rough texture on the face, so the skin looks smoother, tighter and more even.` },
-  { id: 'pigment', cat: 'skin', name: 'Pigmentation', area: 'Full face', type: 'level', def: 2,
-    desc: 'Sun spots, melasma',
-    prompt: k => `PIGMENTATION — remove about ${k(90)}% of dark spots, sun spots, melasma patches and brown marks on the face, leaving an even skin tone.` },
-  { id: 'acne', cat: 'skin', name: 'Acne scars', area: 'Full face', type: 'level', def: 2,
-    desc: 'Smooth scarring and redness',
-    prompt: k => `ACNE — remove about ${k(90)}% of acne scars (pitted, rolling and boxcar scars), acne redness, post-acne marks and pimples, so the facial skin surface is smooth, clear and even. Keep natural pores.` },
-  { id: 'eyeBright', cat: 'skin', name: 'Eye brightening', area: 'Eyes', type: 'level', def: 2,
-    desc: 'Reduce dark circles',
-    prompt: k => `DARK CIRCLES — remove about ${k(85)}% of the dark circles, discoloration and shadows under both eyes, so the under-eye skin matches the cheek tone. Don't change the eyes themselves.` },
-  { id: 'brighten', cat: 'skin', name: 'Face brightening (filter)', area: 'Full face', type: 'level', def: 2,
-    desc: 'Brighter, softer, glowing face — like a beauty filter',
-    prompt: () => '' },
 
 ];
 

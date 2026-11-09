@@ -62,12 +62,15 @@ const WRINKLE = new Set(['glabella', 'crowsFeet', 'bunny', 'mentalis', 'nasolabi
   'booster', 'laser', 'pigment', 'acne']);
 const wrinkleViaAI = id => WRINKLE.has(id) && !!store.get('fal_key');
 const aiItems = () => CATEGORIES.flatMap(c => [...state.plan].filter(([id]) => byId[id].cat === c.id && (!Warp.isShape(id) || wrinkleViaAI(id))));
-const shapeItems = () => [...state.plan].filter(([id]) => Warp.isShape(id) && !wrinkleViaAI(id));
+// "Clear face" switch: a viewing filter added on top of the plan (no AI, works in Live).
+const clearOn = () => $('clearToggle').checked;
+const withClear = list => (clearOn() ? [...list, ['clearFace', 1]] : list);
+const shapeItems = () => withClear([...state.plan].filter(([id]) => Warp.isShape(id) && !wrinkleViaAI(id)));
 // Live shows only treatments with a clear, real effect without AI.
 const LIVE_OK = new Set(['lips', 'cheeks', 'chin', 'jawline', 'browLift', 'lipFlip', 'masseter', 'gummy', 'brighten',
   'nasolabial', 'marionette', 'tearTrough', 'eyeBright', 'booster', 'laser', 'pigment']);   // acne: too weak without AI
 const liveOk = id => LIVE_OK.has(id);
-const liveItems = () => [...state.plan].filter(([id]) => liveOk(id));
+const liveItems = () => withClear([...state.plan].filter(([id]) => liveOk(id)));
 
 function buildPrompt() {
   const items = aiItems();
@@ -254,10 +257,11 @@ function updateUI() {
   const needAI = aiItems().length > 0, needFace = shapeItems().length > 0 || (needAI && protectOn());
   const hasPrompt = $('promptText').value.trim().length > 0;
   const key = store.get('fal_key');
-  $('applyBtn').disabled = !(state.photo && state.plan.size && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
+  const any = state.plan.size || clearOn();
+  $('applyBtn').disabled = !(state.photo && any && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
   $('applyHint').textContent =
     !state.photo ? 'Add a client photo to start.' :
-    !state.plan.size ? 'Select at least one treatment.' :
+    !any ? 'Select at least one treatment (or turn on Clear face).' :
     needFace && state.face === 'loading' ? 'Mapping the face… one moment.' :
     needFace && state.face !== 'ok' ? 'Face not mapped — use a clear, front-facing photo.' :
     needAI && !key ? 'Add your fal API key in ⚙ Settings (needed for skin & line treatments).' :
@@ -357,6 +361,7 @@ function setAreas(on) {
 }
 $('areasBtn').addEventListener('click', () => setAreas(!state.showAreas));
 $('protectToggle').addEventListener('change', updateUI);
+$('clearToggle').addEventListener('change', () => { updateUI(); if (state.live) liveStatus('ok'); });
 
 $('fileInput').addEventListener('change', e => {
   const file = e.target.files?.[0];
@@ -542,7 +547,7 @@ async function loadResult(url) {
 $('applyBtn').addEventListener('click', async () => {
   showError('');
   const ai = aiItems(), shape = shapeItems();
-  if (!state.photo || !state.plan.size) return;
+  if (!state.photo || !(state.plan.size || clearOn())) return;
   const protect = protectOn();
   const { key, model } = getSettings();
   const prompt = $('promptText').value.trim();
@@ -579,7 +584,7 @@ $('applyBtn').addEventListener('click', async () => {
       setLoading('Reshaping…');
       await new Promise(r => setTimeout(r, 30));      // let the spinner paint
       const L = (!ai.length || protect) ? state.faceL : (await Face.detect(base)) || state.faceL;
-      base = Warp.apply(base, L, shape.map(([id, v]) => [id, strength(byId[id], v)]));
+      base = Warp.apply(base, L, shape.map(([id, v]) => [id, byId[id] ? strength(byId[id], v) : 1]));
     }
 
     const url = (base instanceof HTMLCanvasElement ? base : toCanvas(base)).toDataURL('image/jpeg', 0.93);
@@ -659,7 +664,7 @@ function liveStatus(kind) {
   const el = $('liveStatus');
   const text = kind === 'loading' ? 'Starting face tracking…'
     : kind === 'noface' ? 'Face not found — look at the camera'
-    : !state.plan.size ? 'Select treatments on the right to see them live'
+    : !state.plan.size && !clearOn() ? 'Select treatments on the right to see them live'
     : !liveItems().length ? 'Select a treatment on the right (AI treatments are hidden in Live)'
     : '';
   el.hidden = !text;
@@ -692,7 +697,7 @@ async function startLive() {
   try {
     await Live.start({
       video: v, canvas: $('liveCanvas'), overlay: $('liveOverlay'),
-      getItems: () => liveItems().map(([id, val]) => [id, strength(byId[id], val)]),
+      getItems: () => liveItems().map(([id, val]) => [id, byId[id] ? strength(byId[id], val) : 1]),
       onStatus: liveStatus,
     });
   } catch (err) {
