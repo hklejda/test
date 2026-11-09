@@ -385,7 +385,8 @@
       const m = document.createElement('canvas'); m.width = bw; m.height = bh;
       const mc = m.getContext('2d');
       const feather = Math.max(2, (d.feather || 0.025) * d.W);
-      mc.filter = `blur(${feather}px)`;
+      // NOTE: no ctx.filter here — iPhone browsers (WebKit) handle canvas blur differently, which turned
+      // these soft shapes into solid rectangles. The edge is softened in JS below instead (same on every browser).
       mc.fillStyle = '#fff';
       mc.beginPath(); d.poly.forEach((q, i) => (i ? mc.lineTo(q.x - x0, q.y - y0) : mc.moveTo(q.x - x0, q.y - y0))); mc.closePath(); mc.fill();
       if (d.cut) {                                    // keep eyes, brows, lips out of the area
@@ -399,8 +400,10 @@
         mc.globalCompositeOperation = 'source-over';
       }
       const md = mc.getImageData(0, 0, bw, bh).data;
-      wmap = new Float32Array(bw * bh);
-      for (let i = 0; i < bw * bh; i++) wmap[i] = md[i * 4 + 3] / 255;
+      let a = new Float32Array(bw * bh);
+      for (let i = 0; i < bw * bh; i++) a[i] = md[i * 4 + 3] / 255;
+      const r = Math.max(1, Math.round(feather * 0.9));
+      wmap = boxBlur(boxBlur(a, bw, bh, r), bw, bh, r);        // ≈ gaussian feather
     }
     return { x0, y0, bw, bh, img, P: img.data, s2, wmap };
   }
