@@ -146,7 +146,7 @@
           const top = lid.map(q => off(q, 0, 0.022)), bot = lid.slice().reverse().map(q => off(q, 0, 0.115));
           const c = off(P(sx < 0 ? 145 : 374), 0, 0.06);
           // reference skin: the upper cheek just below the crescent
-          const ref = off(P(sx < 0 ? 145 : 374), 0.01 * sx, 0.17);
+          const ref = off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.135);
           out.push({ t: 'U', poly: [...top, ...bot], c, rx: 0.14 * W, ry: 0.08 * W, ang, ref, refR: 0.035 * W,
             amt: Math.min(1, 0.95 * f * sv), W, feather: 0.02 });
         });
@@ -461,7 +461,7 @@
     for (let i = 0; i < rw * rh; i++) Ys.push([0.299 * RP[i * 4] + 0.587 * RP[i * 4 + 1] + 0.114 * RP[i * 4 + 2], i]);
     Ys.sort((a, b) => a[0] - b[0]);
     const ref = [0, 0, 0]; let cnt = 0;
-    for (let j = Math.floor(Ys.length * 0.3); j < Math.floor(Ys.length * 0.8); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
+    for (let j = Math.floor(Ys.length * 0.15); j < Math.floor(Ys.length * 0.55); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
     if (!cnt) return;
     ref[0] /= cnt; ref[1] /= cnt; ref[2] /= cnt;
     const refY = 0.299 * ref[0] + 0.587 * ref[1] + 0.114 * ref[2];
@@ -474,7 +474,7 @@
       if (Yb >= refY) continue;
       const dark = (refY - Yb) / refY;
       if (dark > 0.45) continue;                                // lashes / very dark: leave
-      const t = Math.min(1, d.amt * wf * Math.min(1, dark / 0.06));
+      const t = Math.min(0.8, d.amt * wf * Math.min(1, dark / 0.06));   // never fully to cheek level → no white patch
       for (let k = 0; k < 3; k++) {
         const base = B[k][i] + t * (ref[k] - B[k][i]);          // new base colour
         P[i * 4 + k] = Math.max(0, Math.min(255, base + (C[k][i] - B[k][i])));   // + original fine texture
