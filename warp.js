@@ -120,16 +120,22 @@
       //      instead of being lit up. Fold-sized frequency band, texture and overall light kept.
       case 'nasolabial':
         sides(sx => {
-          const a = P(sx < 0 ? 129 : 358), m = P(sx < 0 ? 61 : 291), len = dist(a, m);
-          out.push({ t: 'W', c: off(mid(a, m), 0.014 * sx, 0.012), rx: len * 0.62 + 0.02 * W, ry: 0.055 * W * sv,
-            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1, 2.0 * f * sv), W, rs: 0.008, rb: 0.06, darkOnly: true });
+          // whole fold: from beside the nostril to just below the mouth corner
+          const a = off(P(sx < 0 ? 129 : 358), 0.008 * sx, 0), m = off(P(sx < 0 ? 61 : 291), 0.03 * sx, 0.045), len = dist(a, m);
+          out.push({ t: 'W', c: mid(a, m), rx: len * 0.62 + 0.02 * W, ry: 0.075 * W * sv,
+            ang: Math.atan2(m.y - a.y, m.x - a.x), amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.085, darkOnly: true, brightK: 0.45 });
+          // filler supports the fold: slight lift of the cheek mass above it
+          push(off(mid(a, m), 0.04 * sx, -0.01), 0.07 * W, 0.08 * W, 0.004 * sx, -0.012);
         });
         break;
       case 'marionette':
         sides(sx => {
-          const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.035 * sx, 0.16), len = dist(a, b2);
-          out.push({ t: 'W', c: off(mid(a, b2), 0.004 * sx, 0.01), rx: len * 0.62, ry: 0.05 * W * sv,
-            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1, 2.0 * f * sv), W, rs: 0.008, rb: 0.055, darkOnly: true });
+          // mouth corner down toward the jaw (marionette line + pre-jowl groove)
+          const a = P(sx < 0 ? 61 : 291), b2 = off(a, 0.045 * sx, 0.2), len = dist(a, b2);
+          out.push({ t: 'W', c: off(mid(a, b2), 0.006 * sx, 0), rx: len * 0.62, ry: 0.075 * W * sv,
+            ang: Math.atan2(b2.y - a.y, b2.x - a.x), amt: Math.min(1, 2.2 * f * sv), W, rs: 0.007, rb: 0.08, darkOnly: true, brightK: 0.45 });
+          // lift the mouth corners slightly (no downturned look)
+          push(off(a, 0.005 * sx, 0.01), 0.05 * W, 0.05 * W, 0, -0.012);
         });
         break;
       case 'tearTrough':
@@ -358,23 +364,25 @@
   // Very strong band values (eyebrows, lashes, hairline, eye corners) are protected.
   function wrinkleSmooth(ctx, w, h, d) {
     const R = region(ctx, w, h, d, 1.15); if (!R) return;
-    const { bw, bh, P } = R, n = bw * bh, Y = new Float32Array(n);
-    for (let i = 0; i < n; i++) Y[i] = 0.299 * P[i * 4] + 0.587 * P[i * 4 + 1] + 0.114 * P[i * 4 + 2];
-    const rs = Math.max(1, Math.round((d.rs || 0.0045) * d.W)), rb = Math.max(2, Math.round((d.rb || 0.045) * d.W));   // keep pores/texture, catch wide deep lines
-    const Ys = boxBlur(Y, bw, bh, rs), Yb = boxBlur(boxBlur(Y, bw, bh, rb), bw, bh, rb);
+    const { bw, bh, P } = R, n = bw * bh;
+    const rs = Math.max(1, Math.round((d.rs || 0.0045) * d.W)), rb = Math.max(2, Math.round((d.rb || 0.045) * d.W));
+    // per channel, so the groove takes the colour of the skin around it (no orange/brown tint)
+    const C = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
+    const S = C.map(a => boxBlur(a, bw, bh, rs)), B = C.map(a => boxBlur(boxBlur(a, bw, bh, rb), bw, bh, rb));
+    const lum = (A, i) => 0.299 * A[0][i] + 0.587 * A[1][i] + 0.114 * A[2][i];
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const i = y * bw + x;
       let wf;
       if (R.wmap) { wf = R.wmap[i]; if (wf < 0.01) continue; }
       else { const s2 = R.s2(x, y); if (s2 >= 1) continue; wf = Math.min(1, (1 - s2) * (1 - s2) * 2.4); }
-      const yy = Y[i];
-      if (yy < 2 || Yb[i] < 2) continue;
-      const band = Ys[i] - Yb[i], rel = Math.abs(band) / Yb[i];
-      if (d.darkOnly && band >= 0) continue;                 // folds: only lift the groove, never darken the skin beside it
-      const k = Math.min(1, Math.max(0, (0.48 - rel) / 0.18));
+      const Yb = lum(B, i); if (Yb < 2) continue;
+      const band = lum(S, i) - Yb, rel = Math.abs(band) / Yb;
+      if (d.darkOnly && band >= 0 && !d.brightK) continue;    // folds: lift the groove…
+      const kk = d.darkOnly && band >= 0 ? d.brightK : 1;      // …and flatten the bulge beside it a little
+      const k = Math.min(1, Math.max(0, (0.48 - rel) / 0.18)) * kk;
       if (!k) continue;
-      const g = Math.max(0.6, (yy - d.amt * wf * k * band) / yy);
-      P[i * 4] = Math.min(255, P[i * 4] * g); P[i * 4 + 1] = Math.min(255, P[i * 4 + 1] * g); P[i * 4 + 2] = Math.min(255, P[i * 4 + 2] * g);
+      const t = Math.min(1, d.amt * wf * k);
+      for (let c = 0; c < 3; c++) P[i * 4 + c] = Math.max(0, Math.min(255, C[c][i] - t * (S[c][i] - B[c][i])));
     }
     ctx.putImageData(R.img, R.x0, R.y0);
   }
