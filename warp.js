@@ -187,9 +187,24 @@
         push(P(4), 0.07 * W, 0.06 * W, 0, -0.014);
         break;
       case 'browLift':
-        sides((sx, p) => {
-          push(p.brow, 0.1 * W, 0.08 * W, 0, -0.042);
-          push(off(p.brow, -0.06 * sx, 0), 0.08 * W, 0.06 * W, 0, -0.012);
+        // Botox brow lift: the brow moves up as one piece — inner end stays, lift grows smoothly
+        // toward the tail. Kernels follow the brow and are tall, so brow + surrounding skin move
+        // together (no stretching, no kinks).
+        sides(sx => {
+          const line = (sx < 0 ? [107, 66, 105, 63, 70, 46] : [336, 296, 334, 293, 300, 276]).map(P);   // inner → tail
+          const tail = line[line.length - 1];
+          const pts = [];
+          for (let i = 0; i < line.length; i++) { pts.push(line[i]); if (i < line.length - 1) pts.push(mid(line[i], line[i + 1])); }
+          pts.push(off(tail, 0.03 * sx, 0.015));               // a little past the tail
+          const lift = 0.024 * W * f * VIS[sx], k = 2.6;          // overlap factor
+          pts.forEach((q, i) => {
+            const t = i / (pts.length - 1), g = t * t * (3 - 2 * t);   // smooth 0 → 1 from inner end to tail
+            if (g < 0.02) return;
+            const v = vec(0, -1);
+            const amt = (lift * g) / k;
+            out.push({ t: 'p', c: off(q, 0, 0.012), rx: 0.05 * W * sv, ry: 0.075 * W, ang,
+              vx: v.x / W * amt, vy: v.y / W * amt });
+          });
         });
         break;
       case 'masseter':
