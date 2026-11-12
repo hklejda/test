@@ -83,6 +83,8 @@
       t: 'L', c: mouth, ang, halfW: lipW * 0.72, taper,
       hu: Math.max(dist(P(0), P(13)), 0.015 * W), hl: Math.max(dist(P(14), P(17)), 0.02 * W),
       eu: eu * f, el: el * f,
+      // open mouth (smile): the opening between the lips must not be stretched (teeth stay as they are)
+      gu: dist(mouth, P(13)), gl: dist(mouth, P(14)),
     });
 
     switch (id) {
@@ -527,8 +529,14 @@
     const C = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
     const r = Math.max(2, Math.round(0.014 * d.W));
     const B = C.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
+    // Very dark things inside the area (glasses frames, lashes, hair) darken the blurred layer around
+    // them; lifting that would draw a bright halo along the frame. Find them and stay away from them.
+    const M = new Float32Array(n);
+    for (let i = 0; i < n; i++) M[i] = (0.299 * C[0][i] + 0.587 * C[1][i] + 0.114 * C[2][i]) < 0.3 * refY ? 1 : 0;
+    const Mb = boxBlur(boxBlur(M, bw, bh, r), bw, bh, r);
     for (let i = 0; i < n; i++) {
-      const wf = R.wmap[i]; if (wf < 0.01) continue;
+      const wf0 = R.wmap[i]; if (wf0 < 0.01) continue;
+      const wf = wf0 * Math.max(0, 1 - Mb[i] * 4); if (wf < 0.01) continue;
       const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i];
       if (Yb >= refY || Yb < 4) continue;
       const dark = (refY - Yb) / refY;
@@ -596,7 +604,7 @@
     for (const d of D) {
       if (d.t === 'L') {           // bounding radius for lip stretch
         d.rx = d.halfW;
-        d.ry = Math.max(d.hu * (1 + d.eu) + d.hu * 1.4, d.hl * (1 + d.el) + d.hl * 1.4);
+        d.ry = Math.max(d.hu * (1 + d.eu) + d.hu * 1.4 + (d.gu || 0), d.hl * (1 + d.el) + d.hl * 1.4 + (d.gl || 0));
       }
       const r = Math.max(d.rx, d.ry) + 2;
       x0 = Math.min(x0, d.c.x - r); y0 = Math.min(y0, d.c.y - r);
@@ -619,8 +627,12 @@
             const u = lx / d.halfW;
             if (u <= -1 || u >= 1) continue;
             const wx = Math.pow(1 - u * u, d.taper || 2);
-            const up = ly < 0, Y = Math.abs(ly), h = up ? d.hu : d.hl, e = (up ? d.eu : d.el) * wx;
+            const up = ly < 0, h = up ? d.hu : d.hl, e = (up ? d.eu : d.el) * wx;
             if (!e) continue;
+            // mouth opening at this column (0 when the mouth is closed): lips grow from their inner edge
+            const ui = u / 0.66, gap = ((up ? d.gu : d.gl) || 0) * Math.sqrt(Math.max(0, 1 - ui * ui));
+            const Y = Math.abs(ly) - gap;
+            if (Y <= 0) continue;                                   // teeth / inside of the mouth: untouched
             const Hn = h * (1 + e), B = h * 1.4;
             let srcY;
             if (Y <= Hn) srcY = Y / (1 + e);                       // lip body: stretched
@@ -628,6 +640,7 @@
               const t = (Y - Hn) / B, sm = t * t * (3 - 2 * t);
               srcY = Y - h * e * (1 - sm);
             } else continue;
+            srcY += gap;
             const dy = (up ? -srcY : srcY) - ly;                    // local offset (face frame)
             ox += -dy * d.sin; oy += dy * d.cos;
             continue;

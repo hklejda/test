@@ -17,7 +17,7 @@ void main() { uv = a * 0.5 + 0.5; gl_Position = vec4(a, 0.0, 1.0); }`;
 
   // Same maths as warp.js (backward mapping), one deformation per uniform slot:
   //   d0 = (type, cx, cy, angle)   type: 0 bulge, 1 push, 2 lip stretch, 3 shadow fill, 4 wrinkle smooth, 5 glow
-  //   d1 = bulge (rx, ry, ax, ay) | push (rx, ry, vx, vy) | lip (halfW, taper, -, -) | shade (rx, ry, amt, -)
+  //   d1 = bulge (rx, ry, ax, ay) | push (rx, ry, vx, vy) | lip (halfW, taper, gapUp, gapLow) | shade (rx, ry, amt, -)
   //   d2 = lip (hu, hl, eu, el) | shade (mipLevel, -, -, -)
   const FS = `#version 300 es
 precision highp float;
@@ -56,14 +56,18 @@ void main() {
       if (abs(u) >= 1.0) continue;
       float wx = pow(1.0 - u * u, b.y);
       bool up = l.y < 0.0;
-      float Y = abs(l.y);
       float h = up ? c.x : c.y;
       float e = (up ? c.z : c.w) * wx;
       if (e <= 0.0) continue;
+      float ui = u / 0.66;
+      float gap = (up ? b.z : b.w) * sqrt(max(0.0, 1.0 - ui * ui));   // mouth opening: not stretched
+      float Y = abs(l.y) - gap;
+      if (Y <= 0.0) continue;
       float Hn = h * (1.0 + e), B = h * 1.4, srcY;
       if (Y <= Hn) srcY = Y / (1.0 + e);
       else if (Y <= Hn + B) { float t = (Y - Hn) / B; float sm = t * t * (3.0 - 2.0 * t); srcY = Y - h * e * (1.0 - sm); }
       else continue;
+      srcY += gap;
       float dy = (up ? -srcY : srcY) - l.y;
       off += vec2(-dy * sn, dy * cs);
     }
@@ -202,7 +206,7 @@ void main() {
       } else if (d.t === 'p') {
         U0.set([1, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.vx, d.vy], j);
       } else if (d.t === 'L') {
-        U0.set([2, d.c.x, d.c.y, d.ang], j); U1.set([d.halfW, d.taper || 2, 0, 0], j); U2.set([d.hu, d.hl, d.eu, d.el], j);
+        U0.set([2, d.c.x, d.c.y, d.ang], j); U1.set([d.halfW, d.taper || 2, d.gu || 0, d.gl || 0], j); U2.set([d.hu, d.hl, d.eu, d.el], j);
       } else if (d.t === 'S') {
         U0.set([3, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.amt, 0], j);
         U2.set([Math.log2(Math.max(1, 0.05 * W)), 0, 0, 0], j);
