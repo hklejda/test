@@ -106,14 +106,14 @@
         // Nothing near the ears/eyes, no widening of the face.
         sides((sx, p) => {
           // radius capped so nothing reaches the face outline (ears, earrings, hair stay put)
-          const r1 = edgeCap(p.apple, 0.16 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.18 * W);
-          bulge(p.apple, r1, r1 * 0.94, 0.22, 0.22);      // gentle magnify (strong values smear skin texture)
-          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.008 * sx, -0.04);
+          const r1 = edgeCap(p.apple, 0.17 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.19 * W);
+          bulge(p.apple, r1, r1 * 0.94, 0.3, 0.3);      // gentle magnify (strong values smear skin texture)
+          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.01 * sx, -0.052);
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
           if (sv > 0.72) {     // skip on a strongly turned-away side (lighting there is unreliable)
             const k = sv * sv * sv;
-            out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.02 * sx * sv, -0.03), rx: 0.12 * W * sv, ry: 0.11 * W, ang, amt: 0.4 * f * k, W, vis: sv, pct: 0.62, maxG: 0.18 });
-            out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0.035 * sx * sv, -0.01), rx: 0.10 * W * sv, ry: 0.1 * W, ang, amt: 0.3 * f * k, W, vis: sv, pct: 0.62, maxG: 0.18 });   // kept off the nose shadow
+            out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.02 * sx * sv, -0.03), rx: 0.12 * W * sv, ry: 0.11 * W, ang, amt: 0.4 * f * k, W, vis: sv, pct: 0.62, maxG: 0.16 });
+            out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0.035 * sx * sv, -0.01), rx: 0.10 * W * sv, ry: 0.1 * W, ang, amt: 0.3 * f * k, W, vis: sv, pct: 0.62, maxG: 0.16 });   // kept off the nose shadow
           }
         });
         break;
