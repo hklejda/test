@@ -198,7 +198,14 @@
         bulge(off(P(152), 0, -0.05), 0.11 * W, 0.09 * W, 0.08, 0.08);
         break;
       case 'jawline':
-        sides((sx, p) => push(p.angle, 0.12 * W, 0.12 * W, 0.026 * sx, 0.014));
+        // One broad, even support along the whole jaw edge (angle → jowl → pre-jowl → chin), so the
+        // line gets straighter and a little stronger. No single strong push: that made a lump at the angle.
+        sides((sx, p) => {
+          if (sv < 0.6) return;                 // side turned away: leave it
+          push(p.angle, 0.17 * W, 0.17 * W, 0.015 * sx, 0.009);
+          push(p.jowl, 0.14 * W, 0.14 * W, 0.008 * sx, 0.010);
+          push(P(sx < 0 ? 149 : 378), 0.11 * W, 0.11 * W, 0.003 * sx, 0.011);
+        });
         push(off(P(152), 0, -0.02), 0.12 * W, 0.1 * W, 0, 0.012);
         break;
       case 'temples':
@@ -236,7 +243,13 @@
         });
         break;
       case 'masseter':
-        sides((sx, p) => push(off(p.angle, -0.02 * sx, -0.04), 0.13 * W, 0.16 * W, -0.035 * sx, 0));
+        // broad, tall kernel + a small one toward the chin → the whole lower-face edge moves in evenly
+        // (a small strong kernel left a dent in the outline)
+        sides((sx, p) => {
+          if (sv < 0.6) return;                 // side turned away: its outline is the cheek, not the jaw → leave it
+          push(off(p.angle, -0.02 * sx, -0.06), 0.17 * W, 0.24 * W, -0.027 * sx, 0);
+          push(p.jowl, 0.12 * W, 0.12 * W, -0.009 * sx, 0);
+        });
         break;
       case 'buccal':
         sides((sx, p) => push(p.lowCheek, 0.12 * W, 0.12 * W, -0.022 * sx, 0));
