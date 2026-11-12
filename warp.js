@@ -105,13 +105,13 @@
         sides((sx, p) => {
           // radius capped so nothing reaches the face outline (ears, earrings, hair stay put)
           const r1 = edgeCap(p.apple, 0.16 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.18 * W);
-          bulge(p.apple, r1, r1 * 0.94, 0.34, 0.34);
-          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.008 * sx, -0.032);
+          bulge(p.apple, r1, r1 * 0.94, 0.22, 0.22);      // gentle magnify (strong values smear skin texture)
+          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.008 * sx, -0.04);
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
           if (sv > 0.72) {     // skip on a strongly turned-away side (lighting there is unreliable)
             const k = sv * sv * sv;
-            out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.02 * sx * sv, -0.03), rx: 0.12 * W * sv, ry: 0.11 * W, ang, amt: 0.7 * f * k, W, vis: sv });
-            out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0.035 * sx * sv, -0.01), rx: 0.10 * W * sv, ry: 0.1 * W, ang, amt: 0.45 * f * k, W, vis: sv });   // kept off the nose shadow
+            out.push({ t: 'S', grp: 'low', c: off(mid(p.apple, p.angle), 0.02 * sx * sv, -0.03), rx: 0.12 * W * sv, ry: 0.11 * W, ang, amt: 0.4 * f * k, W, vis: sv, pct: 0.62, maxG: 0.18 });
+            out.push({ t: 'S', grp: 'apple', c: off(p.apple, 0.035 * sx * sv, -0.01), rx: 0.10 * W * sv, ry: 0.1 * W, ang, amt: 0.3 * f * k, W, vis: sv, pct: 0.62, maxG: 0.18 });   // kept off the nose shadow
           }
         });
         break;
@@ -164,12 +164,12 @@
           // The hollow is a crescent that follows the lower eyelid. Area = band under the lid:
           // from just below the lashes down onto the upper cheek, inner corner to outer third.
           const lid = (sx < 0 ? [133, 155, 154, 153, 145, 144, 163, 7, 33] : [362, 382, 381, 380, 374, 373, 390, 249, 263]).map(P);
-          const top = lid.map(q => off(q, 0, 0.022)), bot = lid.slice().reverse().map(q => off(q, 0, 0.115));
+          const top = lid.map(q => off(q, 0, 0.024)), bot = lid.slice().reverse().map(q => off(q, 0, 0.125));
           const c = off(P(sx < 0 ? 145 : 374), 0, 0.06);
           // reference skin: the upper cheek just below the crescent
-          const ref = off(P(sx < 0 ? 145 : 374), 0.005 * sx, 0.135);
-          out.push({ t: 'U', poly: [...top, ...bot], c, rx: 0.14 * W, ry: 0.08 * W, ang, ref, refR: 0.035 * W,
-            amt: Math.min(1, 0.95 * f * sv), W, feather: 0.02 });
+          const ref = off(P(sx < 0 ? 145 : 374), 0.01 * sx, 0.17);
+          out.push({ t: 'U', poly: [...top, ...bot], c, rx: 0.14 * W, ry: 0.08 * W, ang, ref, refR: 0.045 * W,
+            amt: Math.min(1, 0.8 * f * sv), W, feather: 0.04 });
         });
         break;
       case 'eyeBright':
@@ -322,8 +322,8 @@
     for (let y = 0; y < bh; y += 2) for (let x = 0; x < bw; x += 2) if (ell(x, y, 1.5) < 1) vals.push(S[y * bw + x]);
     if (vals.length < 20) return;
     vals.sort((a, b) => a - b);
-    const ref = vals[Math.floor(vals.length * 0.75)];
-    const maxGain = 1 + 0.3 * d.amt;
+    const ref = vals[Math.floor(vals.length * (d.pct || 0.75))];
+    const maxGain = 1 + (d.maxG || 0.3) * d.amt;
     let lift = 0, cnt = 0;
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const s2 = ell(x, y, 1);
@@ -507,23 +507,30 @@
     for (let i = 0; i < rw * rh; i++) Ys.push([0.299 * RP[i * 4] + 0.587 * RP[i * 4 + 1] + 0.114 * RP[i * 4 + 2], i]);
     Ys.sort((a, b) => a[0] - b[0]);
     const ref = [0, 0, 0]; let cnt = 0;
-    for (let j = Math.floor(Ys.length * 0.15); j < Math.floor(Ys.length * 0.55); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
+    for (let j = Math.floor(Ys.length * 0.3); j < Math.floor(Ys.length * 0.7); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
     if (!cnt) return;
     ref[0] /= cnt; ref[1] /= cnt; ref[2] /= cnt;
     const refY = 0.299 * ref[0] + 0.587 * ref[1] + 0.114 * ref[2];
     const C = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
-    const r = Math.max(2, Math.round(0.012 * d.W));
+    const r = Math.max(2, Math.round(0.014 * d.W));
     const B = C.map(a => boxBlur(boxBlur(a, bw, bh, r), bw, bh, r));
     for (let i = 0; i < n; i++) {
       const wf = R.wmap[i]; if (wf < 0.01) continue;
       const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i];
-      if (Yb >= refY) continue;
+      if (Yb >= refY || Yb < 4) continue;
       const dark = (refY - Yb) / refY;
-      if (dark > 0.45) continue;                                // lashes / very dark: leave
-      const t = Math.min(0.8, d.amt * wf * Math.min(1, dark / 0.06));   // never fully to cheek level → no white patch
-      for (let k = 0; k < 3; k++) {
-        const base = B[k][i] + t * (ref[k] - B[k][i]);          // new base colour
-        P[i * 4 + k] = Math.max(0, Math.min(255, base + (C[k][i] - B[k][i])));   // + original fine texture
+      // smooth ramps (no hard cut-offs → no islands/edges): fade in for slight darkness,
+      // fade out only for lash-dark pixels
+      const k = Math.min(1, dark / 0.06) * Math.min(1, Math.max(0, (0.7 - dark) / 0.2));
+      const t = Math.min(0.75, d.amt * wf * k);
+      if (t <= 0) continue;
+      // lift brightness with a gain (keeps the skin's own hue — no grey/purple cast) …
+      const Yn = Yb + t * (refY - Yb), g = Yn / Yb;
+      for (let c = 0; c < 3; c++) {
+        const lifted = B[c][i] * g;
+        // … and nudge the colour a little toward the cheek (less purple/brown under the eye)
+        const base = lifted + 0.35 * t * (ref[c] * (Yn / refY) - lifted);
+        P[i * 4 + c] = Math.max(0, Math.min(255, base + (C[c][i] - B[c][i]) * (0.85 + 0.15 * g)));
       }
     }
     ctx.putImageData(R.img, x0, y0);
