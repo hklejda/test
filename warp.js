@@ -108,7 +108,10 @@
           // radius capped so nothing reaches the face outline (ears, earrings, hair stay put)
           const r1 = edgeCap(p.apple, 0.17 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.19 * W);
           bulge(p.apple, r1, r1 * 0.94, 0.3, 0.3);      // gentle magnify (strong values smear skin texture)
-          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.01 * sx, -0.052);
+          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.012 * sx, -0.06);
+          // Projection: a fuller cheek stands out more, so it catches a little more light on top of the
+          // apple. On smooth, evenly lit skin this is the only cue that shows the added volume.
+          out.push({ t: 'G', c: off(p.apple, 0.03 * sx * sv, -0.03), rx: 0.17 * W * sv, ry: 0.13 * W, ang, amt: 0.7 * f * sv, bright: 1, soft: 0, edge: 1, W });
           // Shadow fill: hollows under the cheekbone and around the apple get filled in.
           if (sv > 0.72) {     // skip on a strongly turned-away side (lighting there is unreliable)
             const k = sv * sv * sv;
@@ -463,7 +466,7 @@
     const br = d.bright ?? 1, gamma = 1 - 0.16 * d.amt * br, warm = 0.015 * d.amt * br;
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const s2 = R.s2(x, y); if (s2 >= 1) continue;
-      const t = Math.min(1, Math.max(0, (1 - Math.sqrt(s2)) / 0.45)), wgt = t * t * (3 - 2 * t);
+      const t = Math.min(1, Math.max(0, (1 - Math.sqrt(s2)) / (d.edge || 0.45))), wgt = t * t * (3 - 2 * t);   // edge 1 = smooth dome
       const i = y * bw + x;
       const Yv = 0.299 * ch[0][i] + 0.587 * ch[1][i] + 0.114 * ch[2][i];
       const Yb = 0.299 * B[0][i] + 0.587 * B[1][i] + 0.114 * B[2][i] || 1;
