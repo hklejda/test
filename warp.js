@@ -13,7 +13,7 @@
   // Treatments done here WITHOUT AI (reshaping + local filters). Everything else goes to the AI.
   const SHAPE = new Set([
     'lips', 'cheeks', 'chin', 'jawline',
-    'browLift', 'lipFlip', 'gummy', 'masseter',
+    'browLift', 'lipFlip', 'gummy', 'masseter', 'cornerLift', 'jowlLift', 'foxEye', 'lipsUpper', 'lipsLower', 'cupid', 'doubleChin',
     'glabella', 'crowsFeet', 'bunny', 'mentalis',                 // wrinkle smoothing filter
     'nasolabial', 'marionette', 'tearTrough', 'eyeBright',       // shadow fill (folds, under-eyes)
     'booster', 'laser', 'pigment', 'acne',                        // skin filters
@@ -97,6 +97,37 @@
         break;
       case 'lipFlip':
         lipStretch(0.45, 0);
+        break;
+      // ---- prototypes (not in the catalogue yet) ----
+      case 'cornerLift':    // botox to the corner depressor: downturned mouth corners turn slightly up
+        sides((sx) => {
+          const c = P(sx < 0 ? 61 : 291);
+          push(off(c, 0.012 * sx, 0.004), 0.075 * W, 0.065 * W, 0.005 * sx, -0.02);
+        });
+        break;
+      case 'jowlLift':      // threads / filler: the jowl is lifted up and back, cleaner cheek-to-chin line
+        sides((sx, p) => {
+          if (sv < 0.6) return;
+          push(off(p.jowl, -0.01 * sx, -0.03), 0.21 * W, 0.19 * W, -0.005 * sx, -0.022);   // one broad kernel: no notch in the jaw edge
+        });
+        break;
+      case 'foxEye':        // thread lift: outer eye corner and brow tail lifted up and out
+        sides((sx, p) => {
+          const corner = P(sx < 0 ? 33 : 263), tail = P(sx < 0 ? 70 : 300);
+          push(off(corner, 0.025 * sx, -0.012), 0.1 * W * sv, 0.085 * W, 0.02 * sx, -0.03);
+          push(off(tail, 0.01 * sx, 0), 0.11 * W * sv, 0.075 * W, 0.012 * sx, -0.03);
+        });
+        break;
+      case 'lipsUpper': lipStretch(0.68, 0, 2); break;
+      case 'lipsLower': lipStretch(0, 0.5, 2); break;
+      case 'cupid':         // sharper cupid's bow: the two peaks rise a little, the dip between them stays
+        push(P(37), 0.04 * W, 0.035 * W, 0, -0.011);
+        push(P(267), 0.04 * W, 0.035 * W, 0, -0.011);
+        push(off(P(0), 0, -0.004), 0.022 * W, 0.025 * W, 0, 0.005);
+        break;
+      case 'doubleChin':    // fat dissolving: the fullness under the chin is drawn up and in
+        push(off(P(152), 0, 0.075), 0.2 * W, 0.085 * W, 0, -0.03);
+        sides((sx) => push(off(P(sx < 0 ? 150 : 379), 0, 0.05), 0.11 * W, 0.08 * W, -0.012 * sx, -0.012));
         break;
       case 'gummy':
         push(P(0), 0.13 * W, 0.08 * W, 0, 0.016);
