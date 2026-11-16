@@ -103,13 +103,14 @@
         break;
       case 'cheeks':
         // Bigger cheeks by shape only — no brightening of any kind.
-        // 1) the apple is enlarged and lifted, 2) the cheek outline is rounded outward at cheek level.
         sides((sx, p) => {
+          // 1) apple: a little larger and lifted (kept gentle — strong values smear the skin into bands)
           const r1 = edgeCap(p.apple, 0.17 * W), r2 = edgeCap(off(p.apple, 0.02 * sx, 0.03), 0.19 * W);
-          bulge(p.apple, r1, r1 * 0.94, 0.3, 0.3);
-          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.012 * sx, -0.06);
-          // outline: centred between the apple and the face edge, below the cheekbone and above the jaw
-          push(mid(p.apple, p.contourLow), 0.16 * W, 0.15 * W, 0.021 * sx, -0.006);
+          bulge(p.apple, r1, r1 * 0.94, 0.22, 0.22);
+          push(off(p.apple, 0.02 * sx, 0.03), r2, r2 * 0.94, 0.008 * sx, -0.04);
+          // 2) cheekbone: one broad, tall kernel rounds the outline outward from eye level to mouth
+          //    level as a single smooth curve (a small kernel at mid-cheek made a lump and a boxy face)
+          push(off(mid(p.apple, p.zyg), 0, 0.03), 0.2 * W, 0.24 * W, 0.022 * sx, -0.006);
         });
         break;
       // ---- Wrinkle smoothing (no AI): lift thin dark creases toward the surrounding skin ----
@@ -520,6 +521,12 @@
     for (let j = Math.floor(Ys.length * 0.3); j < Math.floor(Ys.length * 0.7); j++) { const i = Ys[j][1]; ref[0] += RP[i * 4]; ref[1] += RP[i * 4 + 1]; ref[2] += RP[i * 4 + 2]; cnt++; }
     if (!cnt) return;
     ref[0] /= cnt; ref[1] /= cnt; ref[2] /= cnt;
+    // Live video: camera noise changes the sampled cheek colour a little every frame, which made the
+    // effect pulse. Follow it slowly instead (d.mem is kept between frames by live.js).
+    if (d.mem) {
+      if (d.mem.ref) for (let k = 0; k < 3; k++) ref[k] = d.mem.ref[k] + 0.12 * (ref[k] - d.mem.ref[k]);
+      d.mem.ref = ref.slice();
+    }
     const refY = 0.299 * ref[0] + 0.587 * ref[1] + 0.114 * ref[2];
     const C = [0, 1, 2].map(k => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = P[i * 4 + k]; return a; });
     const r = Math.max(2, Math.round(0.014 * d.W));

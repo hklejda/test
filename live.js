@@ -227,6 +227,7 @@ void main() {
   // CPU filters (tear troughs, folds…). The finished frame and the treated areas are composed on
   // ONE 2D canvas (the overlay), so both go through the same colour pipeline — on iPhone Safari the
   // WebGL canvas and a 2D canvas render colours slightly differently, which showed as rectangles.
+  const filterMem = {};
   function cpuPost(W, w, h) {
     if (!overlay) return;
     if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; scratch.width = w; scratch.height = h; }
@@ -258,7 +259,9 @@ void main() {
           const i = (y * bw + x) * 4;
           const ex = Math.min(1, Math.min(x, bw - 1 - x) / fb);
           const diff = Math.abs(R[i] - O[i]) + Math.abs(R[i + 1] - O[i + 1]) + Math.abs(R[i + 2] - O[i + 2]);
-          const a = Math.min(1, Math.max(0, (diff - 4) / 10)) * ex * ey;   // ignore tiny round-trip noise
+          // every changed pixel is used as is: a threshold here made faint changes switch on and off
+          // from frame to frame with camera noise (untouched pixels are bit-identical, diff = 0)
+          const a = diff > 0 ? ex * ey : 0;
           R[i + 3] = Math.round(255 * a);
         }
       }
@@ -290,6 +293,7 @@ void main() {
             const W = Math.hypot(smooth[234].x - smooth[454].x, smooth[234].y - smooth[454].y);
             const all = Warp.deforms(items, smooth);
             lastW = all.filter(d => d.t === 'W' || d.t === 'M' || d.t === 'U');
+            lastW.forEach((d, k) => { d.mem = filterMem[d.t + k] || (filterMem[d.t + k] = {}); });   // per-area memory across frames
             n = pack(all, W);
           }
         }
