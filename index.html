@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
-  <script>try { if (!localStorage.getItem('ora_user')) document.documentElement.classList.add('locked'); } catch (e) { document.documentElement.classList.add('locked'); }</script>
-  <link rel="stylesheet" href="style.css?v=202611181158" />
+  <script>try { var k = Object.keys(localStorage); if (!k.some(function (x) { return x === 'ora_user' || /^sb-.+-auth-token$/.test(x); })) document.documentElement.classList.add('locked'); } catch (e) { document.documentElement.classList.add('locked'); }</script>
+  <link rel="stylesheet" href="style.css?v=202611181203" />
 </head>
 <body>
   <!-- ============ Sign in ============ -->
@@ -25,20 +25,31 @@
     </section>
     <section class="login-panel">
       <form id="loginForm" class="login-form" novalidate>
-        <p class="eyebrow">Sign in</p>
-        <h1>Welcome.</h1>
-        <p class="lede">Your details stay on this device and appear on every report.</p>
-        <label class="field"><span class="field-label">Your name</span>
-          <input id="loginName" name="name" autocomplete="name" required placeholder="Full name" />
+        <p class="eyebrow" id="loginEyebrow">Sign in</p>
+        <h1 id="loginTitle">Welcome back.</h1>
+        <p class="lede" id="loginLede">Sign in to your clinic account.</p>
+
+        <div id="authTabs" class="seg full" role="tablist">
+          <button type="button" data-mode="signin" class="on" role="tab">Sign in</button>
+          <button type="button" data-mode="signup" role="tab">Create account</button>
+        </div>
+
+        <label class="field su"><span class="field-label">Your name</span>
+          <input id="loginName" name="name" autocomplete="name" placeholder="Full name" />
         </label>
         <label class="field"><span class="field-label">Email</span>
-          <input id="loginEmail" name="email" type="email" autocomplete="email" required placeholder="you@clinic.com" />
+          <input id="loginEmail" name="email" type="email" autocomplete="email" placeholder="you@clinic.com" />
         </label>
-        <label class="field"><span class="field-label">Clinic name</span>
-          <input id="loginClinic" name="clinic" autocomplete="organization" required placeholder="Your clinic" />
+        <label class="field pw"><span class="field-label">Password <span class="muted su">at least 8 characters</span></span>
+          <input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <label class="field su"><span class="field-label">Clinic name</span>
+          <input id="loginClinic" name="clinic" autocomplete="organization" placeholder="Your clinic" />
         </label>
         <p id="loginError" class="error" hidden></p>
-        <button class="btn btn-solid login-go" type="submit">Start now</button>
+        <p id="loginInfo" class="login-info" hidden></p>
+        <button id="loginGo" class="btn btn-solid login-go" type="submit">Sign in</button>
+        <button id="forgotBtn" class="ghost forgot" type="button">Forgot password?</button>
       </form>
     </section>
   </main>
@@ -208,7 +219,7 @@
    <div class="foot-in">
     <p class="tagline">The best results, <span>through action.</span></p>
     <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
-    <p class="ver">ORA · Tirana · version 202611181158</p>
+    <p class="ver">ORA · Tirana · version 202611181203</p>
    </div>
   </footer>
 
@@ -266,10 +277,11 @@
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611181158"></script>
-  <script src="face.js?v=202611181158"></script>
-  <script src="live.js?v=202611181158"></script>
-  <script src="warp.js?v=202611181158"></script>
-  <script src="app.js?v=202611181158"></script>
+  <script src="config.js?v=202611181203"></script>
+  <script src="data.js?v=202611181203"></script>
+  <script src="face.js?v=202611181203"></script>
+  <script src="live.js?v=202611181203"></script>
+  <script src="warp.js?v=202611181203"></script>
+  <script src="app.js?v=202611181203"></script>
 </body>
 </html>

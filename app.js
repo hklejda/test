@@ -943,33 +943,160 @@ $('noticeCapture').addEventListener('click', () => {
 });
 
 /* ================= Sign in =================
-   A simple local sign-in: name, email and clinic name are kept in this browser only
-   (no server, no password). The clinic name is shown in the navbar and on every report. */
-function currentUser() { try { return JSON.parse(store.get('ora_user') || 'null'); } catch { return null; } }
-function showSignedIn() {
-  const u = currentUser();
-  document.documentElement.classList.toggle('locked', !u);
-  $('navClinic').textContent = store.get('clinic_name') || '';
-  if (u) $('navClinic').title = `${u.name} · ${u.email}`;
+   With Supabase configured (config.js): real accounts, email + password, profile (name, clinic)
+   stored in the database (table "profiles", see supabase/schema.sql).
+   Without it: the simple on-device sign-in (no password), so the app still works. */
+const CFG = window.ORA_CONFIG || {};
+const REMOTE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey);
+let sb = null, authMode = 'signin', profile = null;
+const SB_SRC = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+const loadSb = () => new Promise((res, rej) => {
+  if (window.supabase) return res(window.supabase);
+  const s = document.createElement('script'); s.src = SB_SRC;
+  s.onload = () => window.supabase ? res(window.supabase) : rej(new Error('Supabase missing'));
+  s.onerror = () => rej(new Error('Could not load the sign-in service. Check the internet connection.'));
+  document.head.appendChild(s);
+});
+
+function localUser() { try { return JSON.parse(store.get('ora_user') || 'null'); } catch { return null; } }
+function setLocked(locked) {
+  document.documentElement.classList.toggle('locked', locked);
+  $('navClinic').textContent = locked ? '' : (store.get('clinic_name') || '');
+  if (profile) $('navClinic').title = `${profile.full_name} · ${profile.email || ''}`;
+  if (!locked) window.scrollTo(0, 0);
 }
-$('loginForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const name = $('loginName').value.trim(), email = $('loginEmail').value.trim(), clinic = $('loginClinic').value.trim();
-  const err = !name ? 'Add your name.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'Add a valid email.' : !clinic ? 'Add the clinic name.' : '';
-  $('loginError').textContent = err; $('loginError').hidden = !err;
-  if (err) return;
-  store.set('ora_user', JSON.stringify({ name, email, since: new Date().toISOString() }));
-  store.set('clinic_name', clinic);
-  showSignedIn();
-  window.scrollTo(0, 0);
-});
-$('signOutBtn').addEventListener('click', () => {
-  if (state.live) stopLive();
+function authMsg(err, info) {
+  $('loginError').textContent = err || ''; $('loginError').hidden = !err;
+  $('loginInfo').textContent = info || ''; $('loginInfo').hidden = !info;
+}
+function setAuthMode(m) {
+  authMode = m;
+  const up = m === 'signup', f = $('loginForm');
+  f.classList.toggle('signup', up);
+  document.querySelectorAll('#authTabs button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  $('loginEyebrow').textContent = up ? 'Create account' : 'Sign in';
+  $('loginTitle').textContent = up ? 'Join ORA.' : 'Welcome back.';
+  $('loginLede').textContent = up ? 'One account per clinic team member.' : 'Sign in to your clinic account.';
+  $('loginGo').textContent = up ? 'Create account' : 'Sign in';
+  $('loginPass').autocomplete = up ? 'new-password' : 'current-password';
+  authMsg();
+}
+const busy = on => { $('loginGo').toggleAttribute('disabled', on); on ? $('loginGo').setAttribute('aria-busy', 'true') : $('loginGo').removeAttribute('aria-busy'); };
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const niceErr = e => {
+  const m = (e && e.message) || String(e);
+  if (/invalid login credentials/i.test(m)) return 'Wrong email or password.';
+  if (/email not confirmed/i.test(m)) return 'Confirm your email first: open the link we sent you.';
+  if (/already registered|already exists/i.test(m)) return 'This email already has an account. Sign in instead.';
+  if (/password/i.test(m) && /least|short|weak/i.test(m)) return 'Choose a stronger password (at least 8 characters).';
+  if (/rate limit|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
+  return m;
+};
+
+async function loadProfile(user) {
+  const { data, error } = await sb.from('profiles').select('full_name, clinic_name, email').eq('id', user.id).maybeSingle();
+  profile = data || { full_name: user.user_metadata?.full_name || '', clinic_name: user.user_metadata?.clinic_name || '', email: user.email };
+  if (error) console.warn('profile', error.message);
+  if (profile.clinic_name) store.set('clinic_name', profile.clinic_name);
+}
+
+async function initAuth() {
+  if (!REMOTE) {                                   // on-device sign-in
+    $('loginForm').classList.add('local');
+    $('loginTitle').textContent = 'Welcome.'; $('loginLede').textContent = 'Your details stay on this device and appear on every report.';
+    $('loginGo').textContent = 'Start now';
+    $('loginClinic').value = store.get('clinic_name') || '';
+    setLocked(!localUser());
+    return;
+  }
   try { localStorage.removeItem('ora_user'); } catch {}
-  $('loginName').value = $('loginEmail').value = '';
-  $('loginClinic').value = store.get('clinic_name') || '';
-  showSignedIn();
+  try {
+    const lib = await loadSb();
+    sb = lib.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  } catch (e) { setLocked(true); authMsg(niceErr(e)); return; }
+  sb.auth.onAuthStateChange(async (ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') { setLocked(true); showNewPassword(); return; }
+    if (session?.user) { await loadProfile(session.user); setLocked(false); }
+    else { profile = null; setLocked(true); }
+  });
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user) { await loadProfile(data.session.user); setLocked(false); } else setLocked(true);
+}
+
+function showNewPassword() {
+  setAuthMode('signin');
+  $('loginTitle').textContent = 'New password.'; $('loginLede').textContent = 'Choose a new password for your account.';
+  $('loginGo').textContent = 'Save password'; authMode = 'reset';
+  $('loginEmail').closest('.field').hidden = true; $('forgotBtn').hidden = true; $('authTabs').hidden = true;
+}
+
+$('authTabs').addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setAuthMode(b.dataset.mode); });
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('loginName').value.trim(), email = $('loginEmail').value.trim(), pass = $('loginPass').value, clinic = $('loginClinic').value.trim();
+  if (!REMOTE) {
+    const err = !name ? 'Add your name.' : !validEmail(email) ? 'Add a valid email.' : !clinic ? 'Add the clinic name.' : '';
+    if (err) return authMsg(err);
+    store.set('ora_user', JSON.stringify({ name, email, since: new Date().toISOString() }));
+    store.set('clinic_name', clinic); authMsg(); setLocked(false); return;
+  }
+  if (authMode === 'reset') {
+    if (pass.length < 8) return authMsg('Use at least 8 characters.');
+    busy(true);
+    const { error } = await sb.auth.updateUser({ password: pass }); busy(false);
+    if (error) return authMsg(niceErr(error));
+    $('loginEmail').closest('.field').hidden = false; $('forgotBtn').hidden = false; $('authTabs').hidden = false;
+    setAuthMode('signin'); const { data } = await sb.auth.getSession();
+    if (data.session?.user) { await loadProfile(data.session.user); setLocked(false); }
+    return;
+  }
+  if (authMode === 'signup') {
+    const err = !name ? 'Add your name.' : !validEmail(email) ? 'Add a valid email.' : pass.length < 8 ? 'Use at least 8 characters for the password.' : !clinic ? 'Add the clinic name.' : '';
+    if (err) return authMsg(err);
+    busy(true);
+    const { data, error } = await sb.auth.signUp({ email, password: pass,
+      options: { data: { full_name: name, clinic_name: clinic }, emailRedirectTo: location.origin + location.pathname } });
+    busy(false);
+    if (error) return authMsg(niceErr(error));
+    if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) return authMsg('This email already has an account. Sign in instead.');
+    if (!data.session) { setAuthMode('signin'); $('loginEmail').value = email; return authMsg('', 'Account created. Check your email and open the confirmation link, then sign in.'); }
+    return;                                         // signed in straight away (onAuthStateChange opens the app)
+  }
+  const err = !validEmail(email) ? 'Add a valid email.' : !pass ? 'Add your password.' : '';
+  if (err) return authMsg(err);
+  busy(true);
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  busy(false);
+  if (error) return authMsg(niceErr(error));
+  $('loginPass').value = ''; authMsg();
 });
-$('saveSettings').addEventListener('click', () => setTimeout(showSignedIn, 0));   // clinic renamed in Settings
-$('loginClinic').value = store.get('clinic_name') || '';
-showSignedIn();
+
+$('forgotBtn').addEventListener('click', async () => {
+  const email = $('loginEmail').value.trim();
+  if (!validEmail(email)) return authMsg('Type your email above, then tap “Forgot password?”.');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  authMsg(error ? niceErr(error) : '', error ? '' : 'If that email has an account, a reset link is on its way.');
+});
+
+$('signOutBtn').addEventListener('click', async () => {
+  if (state.live) stopLive();
+  if (sb) await sb.auth.signOut(); else { try { localStorage.removeItem('ora_user'); } catch {} }
+  profile = null;
+  $('loginPass').value = ''; if (REMOTE) $('loginName').value = '';
+  if (!REMOTE) $('loginClinic').value = store.get('clinic_name') || '';
+  setAuthMode('signin'); if (!REMOTE) $('loginForm').classList.add('local');
+  setLocked(true);
+});
+
+// Clinic renamed in Settings → also saved to the account
+$('saveSettings').addEventListener('click', () => setTimeout(async () => {
+  const clinic = store.get('clinic_name') || '';
+  $('navClinic').textContent = clinic;
+  if (sb && profile) {
+    const { data } = await sb.auth.getUser();
+    if (data.user) { await sb.from('profiles').update({ clinic_name: clinic, updated_at: new Date().toISOString() }).eq('id', data.user.id); profile.clinic_name = clinic; }
+  }
+}, 0));
+
+initAuth();

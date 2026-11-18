@@ -31,13 +31,25 @@ Plain HTML, CSS and JavaScript. No build step, no libraries.
 1. Open the app → **⚙ Settings** → paste your fal API key (fal.ai → Dashboard → Keys), choose a model, and optionally add your clinic name.
 2. Add a photo, pick treatments, click **Generate preview**.
 
+## Accounts (email + password)
+
+Sign-in uses [Supabase](https://supabase.com) (free plan). Until it is set up, the app uses a simple on-device sign-in with no password.
+
+1. Create a project at supabase.com.
+2. **SQL Editor → New query** → paste `supabase/schema.sql` → **Run**. This creates the `profiles` table (name, clinic) with row-level security, so each person can only see their own row.
+3. **Authentication → URL Configuration** → set **Site URL** to `https://hklejda.github.io/test/`, so confirmation and password-reset emails link back to the app.
+4. **Project Settings → API** → copy the **Project URL** and the **anon public** key into `config.js`. Both are safe to publish.
+5. Optional: **Authentication → Providers → Email** → turn off "Confirm email" if accounts should work without the confirmation email.
+
 ## Files
 
 - `data.js` – treatment catalog (categories, doses, prompt text)
 - `live.js` – live camera preview: face tracking + GPU (WebGL2) rendering of the reshape treatments
 - `warp.js` – landmark-driven reshaping for shape treatments
 - `face.js` – face landmarks, treatment-area masks, alignment, colour match, protected compositing
-- `app.js` – UI, prompt builder, camera/upload, fal queue API, history, report
+- `config.js` – Supabase project URL and public key (empty = on-device sign-in)
+- `supabase/schema.sql` – database setup for accounts
+- `app.js` – UI, sign-in, prompt builder, camera/upload, fal queue API, history, report
 - `style.css` – styles in the ORA brand (Deep Space Blue, Sea Green, Clash Display + Inter), print report
 - `assets/` – ORA logo mark and favicon
 - `.github/workflows/pages.yml` – deploys to GitHub Pages on every push
