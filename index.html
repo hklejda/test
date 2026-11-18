@@ -11,9 +11,38 @@
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=202611181139" />
+  <script>try { if (!localStorage.getItem('ora_user')) document.documentElement.classList.add('locked'); } catch (e) { document.documentElement.classList.add('locked'); }</script>
+  <link rel="stylesheet" href="style.css?v=202611181153" />
 </head>
 <body>
+  <!-- ============ Sign in ============ -->
+  <main id="login" class="login" aria-label="Sign in">
+    <section class="login-brand">
+      <img class="login-logo" src="assets/ora-mark.png" alt="" width="120" height="118" />
+      <p class="login-word" aria-hidden="true">ORA</p>
+      <p class="login-product">Aesthetic Preview</p>
+      <p class="login-tag">The best results, <span>through action.</span></p>
+    </section>
+    <section class="login-panel">
+      <form id="loginForm" class="login-form" novalidate>
+        <p class="eyebrow">Sign in</p>
+        <h1>Welcome.</h1>
+        <p class="lede">Your details stay on this device and appear on every report.</p>
+        <label class="field"><span class="field-label">Your name</span>
+          <input id="loginName" name="name" autocomplete="name" required placeholder="e.g. Dr. Paola" />
+        </label>
+        <label class="field"><span class="field-label">Email</span>
+          <input id="loginEmail" name="email" type="email" autocomplete="email" required placeholder="you@clinic.com" />
+        </label>
+        <label class="field"><span class="field-label">Clinic name</span>
+          <input id="loginClinic" name="clinic" autocomplete="organization" required placeholder="Your clinic" />
+        </label>
+        <p id="loginError" class="error" hidden></p>
+        <button class="btn btn-solid login-go" type="submit">Start now</button>
+      </form>
+    </section>
+  </main>
+
   <header class="nav">
    <div class="nav-in">
     <a class="brand" href="./" aria-label="ORA Aesthetic Preview, start over">
@@ -22,10 +51,13 @@
       <span class="brand-sep" aria-hidden="true"></span>
       <span class="brand-product">Aesthetic Preview</span>
     </a>
+    <span class="spacer"></span>
+    <span id="navClinic" class="nav-clinic"></span>
     <button id="settingsBtn" class="ghost on-dark" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg>
       Settings
     </button>
+    <button id="signOutBtn" class="ghost on-dark">Sign out</button>
    </div>
   </header>
 
@@ -176,7 +208,7 @@
    <div class="foot-in">
     <p class="tagline">The best results, <span>through action.</span></p>
     <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
-    <p class="ver">ORA · Tirana · version 202611181139</p>
+    <p class="ver">ORA · Tirana · version 202611181153</p>
    </div>
   </footer>
 
@@ -234,10 +266,10 @@
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611181139"></script>
-  <script src="face.js?v=202611181139"></script>
-  <script src="live.js?v=202611181139"></script>
-  <script src="warp.js?v=202611181139"></script>
-  <script src="app.js?v=202611181139"></script>
+  <script src="data.js?v=202611181153"></script>
+  <script src="face.js?v=202611181153"></script>
+  <script src="live.js?v=202611181153"></script>
+  <script src="warp.js?v=202611181153"></script>
+  <script src="app.js?v=202611181153"></script>
 </body>
 </html>

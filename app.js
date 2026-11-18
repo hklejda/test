@@ -941,3 +941,35 @@ $('noticeCapture').addEventListener('click', () => {
     setTimeout(() => { if (state.versions[state.current]) downloadReport(); }, 50);
   }, 0);
 });
+
+/* ================= Sign in =================
+   A simple local sign-in: name, email and clinic name are kept in this browser only
+   (no server, no password). The clinic name is shown in the navbar and on every report. */
+function currentUser() { try { return JSON.parse(store.get('ora_user') || 'null'); } catch { return null; } }
+function showSignedIn() {
+  const u = currentUser();
+  document.documentElement.classList.toggle('locked', !u);
+  $('navClinic').textContent = store.get('clinic_name') || '';
+  if (u) $('navClinic').title = `${u.name} · ${u.email}`;
+}
+$('loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('loginName').value.trim(), email = $('loginEmail').value.trim(), clinic = $('loginClinic').value.trim();
+  const err = !name ? 'Add your name.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'Add a valid email.' : !clinic ? 'Add the clinic name.' : '';
+  $('loginError').textContent = err; $('loginError').hidden = !err;
+  if (err) return;
+  store.set('ora_user', JSON.stringify({ name, email, since: new Date().toISOString() }));
+  store.set('clinic_name', clinic);
+  showSignedIn();
+  window.scrollTo(0, 0);
+});
+$('signOutBtn').addEventListener('click', () => {
+  if (state.live) stopLive();
+  try { localStorage.removeItem('ora_user'); } catch {}
+  $('loginName').value = $('loginEmail').value = '';
+  $('loginClinic').value = store.get('clinic_name') || '';
+  showSignedIn();
+});
+$('saveSettings').addEventListener('click', () => setTimeout(showSignedIn, 0));   // clinic renamed in Settings
+$('loginClinic').value = store.get('clinic_name') || '';
+showSignedIn();
