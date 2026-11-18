@@ -47,12 +47,7 @@ void main() {
       vec2 sl = -l * b.zw * fall;
       off += vec2(sl.x * cs - sl.y * sn, sl.x * sn + sl.y * cs);
     } else if (a.x < 1.5) {
-      vec2 q = l / b.xy;
-      if (c.x >= 0.0) {                       // flat-top push (see warp.js)
-        float e = max(0.0, abs(l.y) - c.x);
-        q.y = e / (l.y > 0.0 ? c.y : b.y);
-      }
-      float s2 = dot(q, q);
+      vec2 q = l / b.xy; float s2 = dot(q, q);
       if (s2 >= 1.0) continue;
       float fall = (1.0 - s2) * (1.0 - s2);
       off -= b.zw * fall;
@@ -209,7 +204,7 @@ void main() {
       if (d.t === 'b') {
         U0.set([0, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.ax, d.ay], j);
       } else if (d.t === 'p') {
-        U0.set([1, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.vx, d.vy], j); U2.set([d.pl ?? -1, d.ryb || d.ry, 0, 0], j);
+        U0.set([1, d.c.x, d.c.y, d.ang], j); U1.set([d.rx, d.ry, d.vx, d.vy], j);
       } else if (d.t === 'L') {
         U0.set([2, d.c.x, d.c.y, d.ang], j); U1.set([d.halfW, d.taper || 2, d.gu || 0, d.gl || 0], j); U2.set([d.hu, d.hl, d.eu, d.el], j);
       } else if (d.t === 'S') {

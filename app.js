@@ -284,11 +284,11 @@ function updateUI() {
   const any = state.plan.size || clearOn();
   $('applyBtn').disabled = !(state.photo && any && (!needAI || hasPrompt) && (!needFace || state.face === 'ok'));
   $('applyHint').textContent =
+    state.live ? 'Capture the photo to make the report.' :
     !state.photo ? 'Upload a photo or start Live.' :
     !any ? 'Select treatments — the preview updates instantly.' :
     needFace && state.face === 'loading' ? 'Mapping the face… one moment.' :
     needFace && state.face !== 'ok' ? 'Face not mapped — use a clear, front-facing photo.' :
-    needAI && !key ? 'Add your fal API key in ⚙ Settings (needed for skin & line treatments).' :
     '';
   $('areasBtn').disabled = !(state.face === 'ok' && state.plan.size);
   $('applyBtn').textContent = state.versions.length ? '✨ Generate new version' : '✨ Generate preview';
@@ -727,7 +727,7 @@ async function startLive() {
   v.srcObject = state.stream;
   await v.play().catch(() => {});
   if (v.videoWidth) $('stage').style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`;   // frame follows the camera shape
-  state.live = true;
+  state.live = true; updateUI();
   ['placeholder', 'singleImg', 'compare', 'areaImg', 'video', 'camGuide', 'snapBtn', 'cancelCamBtn',
    'viewToggle', 'downloadBtn', 'printBtn', 'resetBtn', 'faceStatus'].forEach(id => $(id).hidden = true);
   LIVE_UI.forEach(id => $(id).hidden = false);
@@ -748,7 +748,7 @@ async function startLive() {
 
 function stopLive(restoreView = true) {
   Live.stop();
-  state.live = false;
+  state.live = false; updateUI();
   state.stream?.getTracks().forEach(t => t.stop());
   state.stream = null;
   $('video').srcObject = null;
@@ -804,3 +804,140 @@ renderBuilder();
 renderPlan();
 refreshPrompt(true);
 updateUI();
+
+/* ================= Download report (branded A4, PDF) =================
+   Drawn on a canvas in the ORA style, then saved as a PDF (jsPDF, loaded only when needed).
+   If the PDF library can't load, the same page is saved as a PNG image. */
+const ORA = { deep: '#253D56', sea: '#308965', steel: '#919DA1', petal: '#E9C5DA', off: '#F7F6F4', muted: '#5F6B70', line: '#E2E6E8' };
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+let jsPdfP = null;
+const loadJsPdf = () => jsPdfP || (jsPdfP = new Promise((res, rej) => {
+  if (window.jspdf) return res(window.jspdf);
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s.onload = () => window.jspdf ? res(window.jspdf) : rej(new Error('jsPDF missing'));
+  s.onerror = () => { jsPdfP = null; rej(new Error('jsPDF failed to load')); };
+  document.head.appendChild(s);
+}));
+
+async function buildReportCanvas(v) {
+  try { await document.fonts.ready; } catch (e) {}
+  const W = 1240, H = 1754, M = 90;                      // A4 at 150 dpi
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const DISP = '"Clash Display", Inter, system-ui, sans-serif', SANS = 'Inter, system-ui, sans-serif';
+  const tracked = (txt, px, py, spacing) => { for (const ch of txt) { x.fillText(ch, px, py); px += x.measureText(ch).width + spacing; } return px; };
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+
+  // header band
+  x.fillStyle = ORA.deep; x.fillRect(0, 0, W, 250);
+  const mark = await loadImg('assets/ora-mark.png').catch(() => null);
+  if (mark) x.drawImage(mark, M, 52, 64, 64 * mark.height / mark.width);
+  x.fillStyle = ORA.off; x.font = `500 30px ${DISP}`; x.textBaseline = 'middle';
+  tracked('ORA', M + 84, 86, 14);
+  x.fillStyle = ORA.steel; x.font = `500 15px ${SANS}`; tracked('AESTHETIC PREVIEW', M + 205, 87, 3);
+  x.fillStyle = ORA.off; x.font = `600 52px ${DISP}`; x.textBaseline = 'alphabetic';
+  x.fillText('Treatment preview', M, 192);
+  const clinic = store.get('clinic_name') || '', client = $('clientName').value.trim();
+  const style = (STYLES.find(s => s.id === v.style) || STYLES[1]).name;
+  x.fillStyle = ORA.steel; x.font = `400 20px ${SANS}`;
+  x.fillText([clinic, client && `Client: ${client}`, v.time.toLocaleDateString(), `Style: ${style}`].filter(Boolean).join('  ·  '), M, 228);
+
+  // before / after
+  const [bi, ai] = await Promise.all([loadImg(state.photo), loadImg(v.url)]);
+  const gap = 28, colW = (W - 2 * M - gap) / 2, top = 300, maxH = 640;
+  const fit = im => { const s = Math.min(colW / im.width, maxH / im.height); return [im.width * s, im.height * s]; };
+  const [bw, bh] = fit(bi), [aw, ah] = fit(ai), rowH = Math.max(bh, ah);
+  const drawPic = (im, w, h, cx, label, accent) => {
+    const px = cx + (colW - w) / 2, py = top + (rowH - h) / 2, r = 16;
+    x.save(); x.beginPath(); x.roundRect ? x.roundRect(px, py, w, h, r) : x.rect(px, py, w, h); x.clip();
+    x.drawImage(im, px, py, w, h); x.restore();
+    x.font = `600 15px ${SANS}`; const tw = x.measureText(label).width + 3 * label.length + 28;
+    const lx = cx + (colW - tw) / 2, ly = top + rowH + 22;
+    x.fillStyle = accent ? ORA.sea : ORA.off; x.beginPath(); x.roundRect ? x.roundRect(lx, ly, tw, 34, 17) : x.rect(lx, ly, tw, 34); x.fill();
+    x.fillStyle = accent ? ORA.off : ORA.deep; x.textBaseline = 'middle'; tracked(label, lx + 14, ly + 17, 3); x.textBaseline = 'alphabetic';
+  };
+  drawPic(bi, bw, bh, M, 'BEFORE', false);
+  drawPic(ai, aw, ah, M + colW + gap, 'AFTER · SIMULATED', true);
+
+  // plan table
+  let y = top + rowH + 120;
+  x.fillStyle = ORA.deep; x.font = `600 30px ${DISP}`; x.fillText('Plan', M, y); y += 34;
+  const cols = [M, M + 330, M + 690, W - M - 180];
+  x.font = `600 14px ${SANS}`; x.fillStyle = ORA.muted;
+  ['CATEGORY', 'TREATMENT', 'AREA', 'DOSE'].forEach((h, i) => tracked(h, cols[i], y + 20, 2.5));
+  y += 38; x.fillStyle = ORA.line; x.fillRect(M, y, W - 2 * M, 2); y += 2;
+  let fill = 0, tox = 0;
+  for (const [id, val] of v.plan) {
+    const t = byId[id]; if (!t) continue;
+    if (t.cat === 'filler' && t.type === 'dose') fill += val;
+    if (t.cat === 'botox' && t.type === 'dose') tox += val;
+    x.font = `400 21px ${SANS}`; x.fillStyle = ORA.deep;
+    x.fillText(catById[t.cat].name, cols[0], y + 38); x.fillText(t.name, cols[1], y + 38); x.fillText(t.area, cols[2], y + 38);
+    x.font = `600 21px ${SANS}`; x.fillText(doseText(t, val), cols[3], y + 38);
+    y += 58; x.fillStyle = ORA.line; x.fillRect(M, y, W - 2 * M, 1);
+  }
+  if (!v.plan.length) { x.font = `400 21px ${SANS}`; x.fillStyle = ORA.muted; x.fillText('Clear face view only, no treatments selected.', M, y + 38); y += 58; }
+
+  // totals
+  y += 30;
+  const tiles = [['FILLER', `${+fill.toFixed(2)} mL`], ['BOTOX', `${tox} U`], ['TREATMENTS', String(v.plan.length)]];
+  const tw = (W - 2 * M - 2 * 20) / 3;
+  tiles.forEach(([k, val], i) => {
+    const tx = M + i * (tw + 20);
+    x.fillStyle = ORA.deep; x.beginPath(); x.roundRect ? x.roundRect(tx, y, tw, 110, 20) : x.rect(tx, y, tw, 110); x.fill();
+    x.fillStyle = ORA.steel; x.font = `600 13px ${SANS}`; tracked(k, tx + 26, y + 36, 2.5);
+    x.fillStyle = ORA.off; x.font = `600 38px ${DISP}`; x.fillText(val, tx + 26, y + 86);
+  });
+
+  // footer: motto + disclaimer
+  x.fillStyle = ORA.line; x.fillRect(M, H - 170, W - 2 * M, 1);
+  x.font = `500 15px ${SANS}`; x.fillStyle = ORA.deep;
+  const px = tracked('THE BEST RESULTS, ', M, H - 128, 3.5); x.fillStyle = ORA.sea; tracked('THROUGH ACTION.', px, H - 128, 3.5);
+  x.fillStyle = ORA.muted; x.font = `400 16px ${SANS}`;
+  x.fillText('A visual simulation for consultations, not a guaranteed outcome. Doses are reference values and do not', M, H - 90);
+  x.fillText('replace clinical assessment; the treatment plan is decided by a qualified practitioner.', M, H - 66);
+  return c;
+}
+
+async function downloadReport() {
+  const v = state.versions[state.current];
+  const btn = $('reportBtn');
+  btn.setAttribute('aria-busy', 'true'); const label = btn.lastChild.textContent; btn.lastChild.textContent = ' Generating…';
+  try {
+    const c = await buildReportCanvas(v);
+    const name = `ORA-report${$('clientName').value.trim() ? '-' + $('clientName').value.trim().replace(/[^\w-]+/g, '_') : ''}-${v.time.toISOString().slice(0, 10)}`;
+    try {
+      const { jsPDF } = await loadJsPdf();
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+      pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+      pdf.save(name + '.pdf');
+    } catch (e) {                                          // no PDF library: same page as an image
+      const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = name + '.png'; a.click();
+    }
+  } finally {
+    btn.removeAttribute('aria-busy'); btn.lastChild.textContent = label;
+  }
+}
+
+function needCapture() {
+  const live = !!state.live;
+  $('noticeTitle').textContent = live ? 'Capture the photo first.' : 'Add a photo first.';
+  $('noticeText').textContent = live
+    ? 'The report is made from a captured photo. Capture it, then the report is generated.'
+    : 'Upload a photo or start Live and capture, then the report is generated.';
+  $('noticeCapture').hidden = !live;
+  $('notice').showModal();
+}
+
+$('reportBtn').addEventListener('click', () => {
+  if (state.live || !state.versions[state.current]) return needCapture();
+  downloadReport();
+});
+$('noticeCapture').addEventListener('click', () => {
+  // dialog closes itself (method=dialog); capture, then generate from the captured frame
+  setTimeout(() => {
+    $('liveCaptureBtn').click();
+    setTimeout(() => { if (state.versions[state.current]) downloadReport(); }, 50);
+  }, 0);
+});

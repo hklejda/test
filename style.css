@@ -303,6 +303,9 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .error { color: var(--error); margin: 0; font-size: .88rem; white-space: pre-wrap; }
 .plan .error { color: var(--petal); }
 
+#reportBtn { justify-content: center; width: 100%; height: 46px; margin-top: 2px; }
+#reportBtn[aria-busy="true"] { opacity: .7; cursor: progress; }
+
 /* ---------- Footer ---------- */
 .foot { background: var(--deep); color: var(--steel); font-size: .8rem; }
 .foot-in { max-width: 1200px; margin: 0 auto; padding: 28px 24px 32px; }
@@ -317,6 +320,10 @@ dialog { border: 0; border-radius: var(--r-card); background: var(--card); color
 dialog::backdrop { background: rgba(26,45,64,.5); }
 .settings-form { display: flex; flex-direction: column; gap: 18px; padding: 26px; }
 .settings-form h2 { font-family: var(--display); font-weight: 600; font-size: 1.45rem; margin: 0; color: var(--deep); }
+
+.notice { align-items: flex-start; }
+.notice-mark { width: 44px; height: auto; }
+.notice-text { margin: -6px 0 0; color: var(--muted); }
 
 /* ---------- Print report ---------- */
 .report { display: none; }

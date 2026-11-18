@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=202611181130" />
+  <link rel="stylesheet" href="style.css?v=202611181139" />
 </head>
 <body>
   <header class="nav">
@@ -156,6 +156,11 @@
           <input id="clientName" placeholder="Optional" autocomplete="off" />
         </label>
 
+        <button id="reportBtn" class="btn btn-solid full">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>
+          Download report
+        </button>
+
         <div hidden>
           <textarea id="promptText"></textarea>
           <button id="resetPromptBtn">Rebuild</button>
@@ -171,7 +176,7 @@
    <div class="foot-in">
     <p class="tagline">The best results, <span>through action.</span></p>
     <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
-    <p class="ver">ORA · Tirana · version 202611181130</p>
+    <p class="ver">ORA · Tirana · version 202611181139</p>
    </div>
   </footer>
 
@@ -215,11 +220,24 @@
     </form>
   </dialog>
 
+  <!-- ============ Notice (report needs a photo) ============ -->
+  <dialog id="notice" aria-labelledby="noticeTitle">
+    <form method="dialog" class="settings-form notice">
+      <img class="notice-mark" src="assets/ora-mark.png" alt="" width="44" height="43" />
+      <h2 id="noticeTitle">Capture the photo first.</h2>
+      <p id="noticeText" class="notice-text">The report is made from a captured photo. Capture it, then the report is generated.</p>
+      <div class="row end">
+        <button value="cancel" class="btn btn-line">OK</button>
+        <button id="noticeCapture" value="capture" class="btn btn-solid">Capture &amp; download</button>
+      </div>
+    </form>
+  </dialog>
+
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611181130"></script>
-  <script src="face.js?v=202611181130"></script>
-  <script src="live.js?v=202611181130"></script>
-  <script src="warp.js?v=202611181130"></script>
-  <script src="app.js?v=202611181130"></script>
+  <script src="data.js?v=202611181139"></script>
+  <script src="face.js?v=202611181139"></script>
+  <script src="live.js?v=202611181139"></script>
+  <script src="warp.js?v=202611181139"></script>
+  <script src="app.js?v=202611181139"></script>
 </body>
 </html>

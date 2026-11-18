@@ -219,7 +219,6 @@
         // while the forehead above absorbs the movement. Dense, wide kernels → smooth, no waves.
         sides(sx => {
           const line = (sx < 0 ? [107, 66, 105, 63, 70, 46] : [336, 296, 334, 293, 300, 276]).map(P);   // inner → tail
-          const lid = (sx < 0 ? [33, 246, 161, 160, 159, 158, 157, 173, 133] : [263, 466, 388, 387, 386, 385, 384, 398, 362]).map(P);   // upper lash line
           const cum = [0];
           for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + dist(line[i - 1], line[i]));
           const total = cum[cum.length - 1];
@@ -230,22 +229,14 @@
           };
           const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
           const N = 14, lift = 0.036 * W * f * VIS[sx], rx = 0.07 * W * sv;
-          // The whole brow band moves by the same amount (flat top), so the brow keeps its thickness.
-          // Forehead above absorbs the move; upper-lid skin below stretches a little; the eye stays.
           const spacing = total / (N - 1), overlap = (rx * 2 * 0.53) / Math.max(1, spacing);   // ∫(1-s²)² ≈ 0.53·2r
           const v = vec(0, -1);
           for (let n = 0; n < N; n++) {
             const u = n / (N - 1);
-            const prof = 0.25 * ss(0.15, 0.6, u) + 0.75 * ss(0.35, 0.95, u);   // inner end stays, rises toward the tail (tail highest)
+            const prof = ss(0.12, 0.62, u) * (1 - 0.2 * ss(0.75, 1, u));   // 0 inner → 1 at arch → 0.8 at tail
             if (prof < 0.01) continue;
             const amt = (lift * prof) / overlap;
-            const L = (lift * prof) / W;                         // this column's move, face widths
-            // below the brow the move fades out by the upper lash line, spread over all of the lid skin
-            // (a short fade stretched the lid into streaks); the eye itself stays put
-            const bp = at(u), gap = Math.min(...lid.map(q => dist(q, bp))) / W;
-            const ryb = Math.max(0.05, gap - 0.034 + L + 0.008);
-            out.push({ t: 'p', c: off(bp, 0, 0.0125 - L), rx, ry: 0.09 * W, ryb: ryb * W, pl: 0.022 * W, ang,
-              vx: v.x / W * amt, vy: v.y / W * amt });
+            out.push({ t: 'p', c: off(at(u), 0, 0.03), rx, ry: 0.085 * W, ang, vx: v.x / W * amt, vy: v.y / W * amt });
           }
         });
         break;
@@ -617,7 +608,7 @@
         d.rx = d.halfW;
         d.ry = Math.max(d.hu * (1 + d.eu) + d.hu * 1.4 + (d.gu || 0), d.hl * (1 + d.el) + d.hl * 1.4 + (d.gl || 0));
       }
-      const r = Math.max(d.rx, d.ry + (d.pl || 0)) + 2;
+      const r = Math.max(d.rx, d.ry) + 2;
       x0 = Math.min(x0, d.c.x - r); y0 = Math.min(y0, d.c.y - r);
       x1 = Math.max(x1, d.c.x + r); y1 = Math.max(y1, d.c.y + r);
     }
@@ -656,11 +647,7 @@
             ox += -dy * d.sin; oy += dy * d.cos;
             continue;
           }
-          let s2;
-          if (d.pl !== undefined) {      // flat-top push: constant move inside a band (keeps a shape's thickness)
-            const a = Math.abs(ly) - d.pl, q = a <= 0 ? 0 : a / (ly > 0 ? d.ryb : d.ry);
-            s2 = (lx / d.rx) ** 2 + q * q;
-          } else s2 = (lx / d.rx) ** 2 + (ly / d.ry) ** 2;
+          const s2 = (lx / d.rx) ** 2 + (ly / d.ry) ** 2;
           if (s2 >= 1) continue;
           const fall = (1 - s2) * (1 - s2);
           if (d.t === 'b') {
