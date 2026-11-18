@@ -3,20 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Aesthetic Preview</title>
+  <title>ORA · Aesthetic Preview</title>
+  <meta name="theme-color" content="#253D56" />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=202611160954" />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=202611181123" />
 </head>
 <body>
-  <header class="top">
-    <a class="wordmark" href="./" aria-label="Aesthetic Preview, start over">Aesthetic <em>Preview</em></a>
-    <button id="settingsBtn" class="quiet" aria-label="Settings">
+  <header class="nav">
+   <div class="nav-in">
+    <a class="brand" href="./" aria-label="ORA Aesthetic Preview, start over">
+      <img class="brand-mark" src="assets/ora-mark.png" alt="" width="40" height="39" />
+      <span class="brand-word" aria-hidden="true">ORA</span>
+      <span class="brand-sep" aria-hidden="true"></span>
+      <span class="brand-product">Aesthetic Preview</span>
+    </a>
+    <button id="settingsBtn" class="ghost on-dark" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg>
       Settings
     </button>
+   </div>
   </header>
+
+  <section class="intro" aria-label="Introduction">
+    <p class="eyebrow">Treatment preview</p>
+    <h1>See it before you book.</h1>
+    <p class="lede">Upload a photo or go live. Pick treatments and doses, and the result updates instantly. Nothing leaves this device.</p>
+  </section>
 
   <!-- kept for app.js (progress state); not shown -->
   <ol class="steps" hidden><li id="step1"></li><li id="step2"></li><li id="step3"></li></ol>
@@ -33,15 +50,15 @@
         <button id="liveBtn" class="btn btn-line live-btn"><span class="rec" aria-hidden="true"></span>Live</button>
         <button id="cameraBtn" hidden>Camera</button>
         <span class="spacer"></span>
-        <button id="resetBtn" class="quiet" hidden>New photo</button>
+        <button id="resetBtn" class="ghost" hidden>New photo</button>
       </div>
 
       <div id="stage" class="stage">
         <div id="placeholder" class="placeholder">
-          <svg class="oval" viewBox="0 0 120 150" aria-hidden="true"><ellipse cx="60" cy="75" rx="52" ry="68"/></svg>
-          <p class="ph-title">Start with a face</p>
-          <p class="ph-text">Upload a front-facing photo, or use Live to see treatments on the camera in real time.</p>
-          <p class="ph-tip">Even light, hair off the face, relaxed expression.</p>
+          <img class="ph-mark" src="assets/ora-mark.png" alt="" width="72" height="71" />
+          <p class="ph-title">Start with a face.</p>
+          <p class="ph-text">Upload a front-facing photo, or go Live to see treatments on the camera.</p>
+          <p class="ph-tip">Even light · hair off the face · relaxed expression</p>
         </div>
 
         <video id="video" playsinline autoplay muted hidden></video>
@@ -77,7 +94,7 @@
         <div class="row stage-actions">
           <button id="liveCaptureBtn" class="btn btn-solid" hidden>Capture</button>
           <button id="liveHoldBtn" class="btn btn-line" hidden>Hold to see before</button>
-          <button id="liveExitBtn" class="quiet" hidden>Exit live</button>
+          <button id="liveExitBtn" class="ghost" hidden>Exit live</button>
           <button id="snapBtn" hidden>Capture photo</button>
           <button id="cancelCamBtn" hidden>Cancel</button>
           <div id="viewToggle" class="seg" hidden>
@@ -87,8 +104,8 @@
             <button data-view="raw" id="rawViewBtn" hidden>Raw</button>
           </div>
           <span class="spacer"></span>
-          <a id="downloadBtn" class="quiet" download="aesthetic-preview.jpg" hidden>Save image</a>
-          <button id="printBtn" class="quiet" hidden>Print report</button>
+          <a id="downloadBtn" class="ghost" download="ora-preview.jpg" hidden>Save image</a>
+          <button id="printBtn" class="btn btn-line" hidden>Print report</button>
         </div>
       </div>
 
@@ -124,7 +141,7 @@
       <section class="block plan">
         <div class="block-head">
           <h2>Plan</h2>
-          <button id="clearBtn" class="quiet">Clear all</button>
+          <button id="clearBtn" class="ghost">Clear all</button>
         </div>
         <div id="planList" class="plan-list"></div>
         <p id="planEmpty" class="hint">Nothing selected yet.</p>
@@ -151,13 +168,17 @@
   </main>
 
   <footer class="foot">
+   <div class="foot-in">
+    <p class="tagline">The best results, <span>through action.</span></p>
     <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
-    <p class="ver">version 202611160954</p>
+    <p class="ver">ORA · Tirana · version 202611181123</p>
+   </div>
   </footer>
 
   <!-- ============ Print report ============ -->
   <section id="report" class="report" aria-hidden="true">
     <header>
+      <div class="r-brand"><img src="assets/ora-mark.png" alt="" width="34" height="33" /><span>ORA</span></div>
       <h1>Treatment preview</h1>
       <p id="rMeta"></p>
     </header>
@@ -166,6 +187,7 @@
       <figure><img id="rAfter" alt="After (simulation)" /><figcaption>After, simulated</figcaption></figure>
     </div>
     <table id="rTable"></table>
+    <p class="r-tag">The best results, <span>through action.</span></p>
     <p class="r-note">A visual simulation for consultations. Actual results vary. Doses are reference values and do not replace clinical assessment.</p>
   </section>
 
@@ -187,17 +209,17 @@
       </label>
 
       <div class="row end">
-        <button value="cancel" class="quiet">Close</button>
+        <button value="cancel" class="btn btn-line">Close</button>
         <button id="saveSettings" value="save" class="btn btn-solid">Save</button>
       </div>
     </form>
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="data.js?v=202611160954"></script>
-  <script src="face.js?v=202611160954"></script>
-  <script src="live.js?v=202611160954"></script>
-  <script src="warp.js?v=202611160954"></script>
-  <script src="app.js?v=202611160954"></script>
+  <script src="data.js?v=202611181123"></script>
+  <script src="face.js?v=202611181123"></script>
+  <script src="live.js?v=202611181123"></script>
+  <script src="warp.js?v=202611181123"></script>
+  <script src="app.js?v=202611181123"></script>
 </body>
 </html>

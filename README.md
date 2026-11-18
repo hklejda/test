@@ -1,4 +1,4 @@
-# Aesthetic Preview
+# ORA · Aesthetic Preview
 
 A browser studio for aesthetic consultations: take or upload a client photo, build a treatment plan, and generate an AI before/after preview with a fal.ai image-editing model.
 
@@ -38,7 +38,8 @@ Plain HTML, CSS and JavaScript. No build step, no libraries.
 - `warp.js` – landmark-driven reshaping for shape treatments
 - `face.js` – face landmarks, treatment-area masks, alignment, colour match, protected compositing
 - `app.js` – UI, prompt builder, camera/upload, fal queue API, history, report
-- `style.css` – styles (light/dark, print)
+- `style.css` – styles in the ORA brand (Deep Space Blue, Sea Green, Clash Display + Inter), print report
+- `assets/` – ORA logo mark and favicon
 - `.github/workflows/pages.yml` – deploys to GitHub Pages on every push
 
 ## Important
