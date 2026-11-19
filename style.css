@@ -350,6 +350,55 @@ html.locked .nav, html.locked .intro, html.locked .layout, html.locked .foot { d
 #reportBtn { justify-content: center; width: 100%; height: 46px; margin-top: 2px; }
 #reportBtn[aria-busy="true"] { opacity: .7; cursor: progress; }
 
+/* estimate (inside the dark Plan card) */
+.estimate { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: rgba(247,246,244,.06); border: 1px solid rgba(48,137,101,.45); }
+.est-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.est-head span { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--petal); font-weight: 600; }
+.est-head strong { font-family: var(--display); font-weight: 600; font-size: 1.9rem; color: var(--off); font-variant-numeric: tabular-nums; }
+.est-lines { display: flex; flex-direction: column; gap: 6px; }
+.est-line { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; }
+.el-name { display: flex; flex-direction: column; }
+.el-name small { color: var(--steel); font-size: .78rem; }
+.el-cost { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.est-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.est-pick label { display: flex; flex-direction: column; gap: 4px; font-size: .74rem; color: var(--steel); min-width: 0; }
+.est-pick label:only-child, .est-pick label:has(+ label[hidden]), .est-pick label[hidden] + label { grid-column: 1 / -1; }
+.est-pick select { height: 38px; border-radius: var(--r-sm); border: 1px solid rgba(247,246,244,.18); background: rgba(247,246,244,.07); color: var(--off); padding: 0 10px; font-size: .88rem; min-width: 0; }
+.est-pick select option { color: var(--deep); }
+.est-note { margin: 0; font-size: .76rem; color: var(--steel); }
+
+/* settings: products & prices */
+dialog#settings { width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+.prices { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
+.prices-head { display: flex; justify-content: space-between; align-items: baseline; }
+.prices h3 { font-family: var(--display); font-weight: 600; font-size: 1.15rem; margin: 0; color: var(--deep); }
+.prices h4 { margin: 8px 0 0; font-size: .86rem; color: var(--deep); }
+.prices h4 .muted { font-weight: 400; font-size: .8rem; }
+.prod-list { display: flex; flex-direction: column; gap: 6px; }
+.prod-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 92px auto 76px 24px; align-items: center; gap: 8px; }
+.prod-row input[type=number], .prod-row .prod-name { height: 38px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--off); padding: 0 10px; color: var(--deep); width: 100%; min-width: 0; }
+.prod-row input:focus { outline: none; border-color: var(--sea); box-shadow: 0 0 0 3px rgba(48,137,101,.18); }
+.prod-money { position: relative; }
+.prod-money span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .88rem; }
+.prod-money input { padding-left: 24px !important; }
+.prod-per { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+.prod-extra { display: flex; align-items: center; gap: 4px; font-size: .8rem; color: var(--muted); }
+.prod-extra input { padding: 0 6px !important; }
+.prod-row .x { border: 0; background: none; color: var(--muted); font-size: 1.1rem; }
+.prod-row .x:hover { color: var(--error); }
+.prod-def { position: relative; display: grid; place-items: center; cursor: pointer; }
+.prod-def input { position: absolute; opacity: 0; }
+.prod-def span { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.prod-def input:checked + span { background: var(--sea); border-color: var(--sea); box-shadow: 0 0 0 3px rgba(48,137,101,.18); }
+.prod-def input:focus-visible + span { outline: 2px solid var(--sea); outline-offset: 2px; }
+.ghost.add { align-self: flex-start; padding-left: 0; }
+.switch.small .switch-text { font-size: .9rem; }
+@media (max-width: 560px) {
+  .prod-row { grid-template-columns: 22px minmax(0, 1fr) 84px 24px; row-gap: 4px; }
+  .prod-per { display: none; }
+  .prod-extra { grid-column: 2 / 4; }
+}
+
 /* ---------- Footer ---------- */
 .foot { background: var(--deep); color: var(--steel); font-size: .8rem; }
 .foot-in { max-width: 1200px; margin: 0 auto; padding: 28px 24px 32px; }

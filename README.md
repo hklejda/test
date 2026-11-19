@@ -14,6 +14,7 @@ Live: https://hklejda.github.io/test/
 - Filter by face area, adjust dose or intensity per treatment
 - **Result style:** Natural / Balanced / Enhanced
 - Treatment plan summary with total filler mL and botox units
+- **Estimated price (EUR):** each clinic keeps its filler and botox products with prices in Settings (saved to the account). Fillers are charged per syringe (whole syringes by default), botox per unit, with a units factor for products such as Dysport. The estimate shows in the Plan and on the report.
 - Compare slider, side-by-side or after-only view
 - Version history for comparing plans
 - Printable report (before/after and plan table) → save as PDF
@@ -49,6 +50,7 @@ Sign-in uses [Supabase](https://supabase.com) (free plan). Until it is set up, t
 - `face.js` – face landmarks, treatment-area masks, alignment, colour match, protected compositing
 - `config.js` – Supabase project URL and public key (empty = on-device sign-in)
 - `supabase/schema.sql` – database setup for accounts
+- `pricing.js` – products, prices and the estimate
 - `app.js` – UI, sign-in, prompt builder, camera/upload, fal queue API, history, report
 - `style.css` – styles in the ORA brand (Deep Space Blue, Sea Green, Clash Display + Inter), print report
 - `assets/` – ORA logo mark and favicon

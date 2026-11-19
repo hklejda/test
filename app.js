@@ -222,6 +222,7 @@ function renderPlan() {
   $('totFiller').textContent = `${fmtNum(sum('filler'))} mL`;
   $('totBotox').textContent = `${fmtNum(sum('botox'))} U`;
   $('totCount').textContent = state.plan.size;
+  if ((typeof Pricing !== 'undefined')) Pricing.render();
 }
 
 function renderStyles() {
@@ -666,7 +667,12 @@ $('printBtn').addEventListener('click', () => {
     v.plan.map(([id, val]) => {
       const t = byId[id];
       return `<tr><td>${esc(catById[t.cat].name)}</td><td>${esc(t.name)}</td><td>${esc(t.area)}</td><td>${esc(doseText(t, val))}</td></tr>`;
-    }).join('');
+    }).join('') + (() => {
+      if (!(typeof Pricing !== 'undefined')) return '';
+      const e = Pricing.estimate(v.plan); if (!e.lines.length) return '';
+      return e.lines.map(l => `<tr><td colspan="3">${esc(l.product)} · ${esc(l.qty)}</td><td>${esc(Pricing.eur(Math.round(l.cost)))}</td></tr>`).join('') +
+        `<tr><th colspan="3">Estimated price (EUR)</th><th>${esc(Pricing.eur(Math.round(e.total)))}</th></tr>`;
+    })();
   // wait for the result image to load before printing
   const img = $('rAfter');
   if (img.complete) window.print(); else img.onload = () => { img.onload = null; window.print(); };
@@ -881,14 +887,21 @@ async function buildReportCanvas(v) {
 
   // totals
   y += 30;
+  const est = (typeof Pricing !== 'undefined') ? Pricing.estimate(v.plan) : { total: 0, lines: [] };
   const tiles = [['FILLER', `${+fill.toFixed(2)} mL`], ['BOTOX', `${tox} U`], ['TREATMENTS', String(v.plan.length)]];
-  const tw = (W - 2 * M - 2 * 20) / 3;
+  if (est.lines.length) tiles.push(['ESTIMATE (EUR)', Pricing.eur(Math.round(est.total))]);
+  const tw = (W - 2 * M - (tiles.length - 1) * 20) / tiles.length;
   tiles.forEach(([k, val], i) => {
     const tx = M + i * (tw + 20);
     x.fillStyle = ORA.deep; x.beginPath(); x.roundRect ? x.roundRect(tx, y, tw, 110, 20) : x.rect(tx, y, tw, 110); x.fill();
     x.fillStyle = ORA.steel; x.font = `600 13px ${SANS}`; tracked(k, tx + 26, y + 36, 2.5);
-    x.fillStyle = ORA.off; x.font = `600 38px ${DISP}`; x.fillText(val, tx + 26, y + 86);
+    x.fillStyle = i === 3 ? '#6FC29B' : ORA.off; x.font = `600 ${tiles.length > 3 ? 34 : 38}px ${DISP}`; x.fillText(val, tx + 26, y + 86);
   });
+  if (est.lines.length) {
+    x.font = `400 17px ${SANS}`; x.fillStyle = ORA.muted;
+    x.fillText(est.lines.map(l => `${l.product}: ${l.qty} · ${l.unit}`).join('    ·    '), M, y + 146);
+    x.fillText('Estimated price. The final price is set by the clinic after consultation.', M, y + 172);
+  }
 
   // footer: motto + disclaimer
   x.fillStyle = ORA.line; x.fillRect(M, H - 170, W - 2 * M, 1);
@@ -994,10 +1007,13 @@ const niceErr = e => {
 };
 
 async function loadProfile(user) {
-  const { data, error } = await sb.from('profiles').select('full_name, clinic_name, email').eq('id', user.id).maybeSingle();
+  const { data, error } = await sb.from('profiles').select('full_name, clinic_name, email, pricing').eq('id', user.id).maybeSingle();
   profile = data || { full_name: user.user_metadata?.full_name || '', clinic_name: user.user_metadata?.clinic_name || '', email: user.email };
   if (error) console.warn('profile', error.message);
   if (profile.clinic_name) store.set('clinic_name', profile.clinic_name);
+  // account prices win over this device's copy; if the price module isn't loaded yet it picks them up itself
+  if (profile.pricing) { window.__oraRemotePricing = profile.pricing; if (typeof Pricing !== 'undefined') Pricing.useRemote(profile.pricing); }
+  else if (data && typeof Pricing !== 'undefined') window.onPricingSaved(Pricing.config);   // first sign-in: keep this device's prices
 }
 
 async function initAuth() {
@@ -1100,3 +1116,12 @@ $('saveSettings').addEventListener('click', () => setTimeout(async () => {
 }, 0));
 
 initAuth();
+
+// Prices changed in Settings → saved to the account (Supabase) as well
+window.onPricingSaved = async c => {
+  if (!sb) return;
+  try {
+    const { data } = await sb.auth.getUser();
+    if (data.user) await sb.from('profiles').update({ pricing: c, updated_at: new Date().toISOString() }).eq('id', data.user.id);
+  } catch (e) { console.warn('pricing sync', e); }
+};

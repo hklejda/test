@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
   <script>try { var k = Object.keys(localStorage); if (!k.some(function (x) { return x === 'ora_user' || /^sb-.+-auth-token$/.test(x); })) document.documentElement.classList.add('locked'); } catch (e) { document.documentElement.classList.add('locked'); }</script>
-  <link rel="stylesheet" href="style.css?v=202611191250" />
+  <link rel="stylesheet" href="style.css?v=202611191258" />
 </head>
 <body>
   <!-- ============ Sign in ============ -->
@@ -195,6 +195,16 @@
           <div><dt>Treatments</dt><dd id="totCount">0</dd></div>
         </dl>
 
+        <div id="estimate" class="estimate" hidden>
+          <div class="est-head"><span>Estimated price</span><strong id="estTotal">€0</strong></div>
+          <div id="estLines" class="est-lines"></div>
+          <div class="est-pick">
+            <label><span>Filler product</span><select id="estFiller"></select></label>
+            <label><span>Botox product</span><select id="estBotox"></select></label>
+          </div>
+          <p class="est-note">Estimate in euros. The final price is set by the clinic.</p>
+        </div>
+
         <label class="field"><span class="field-label">Client name <span class="muted">for the report</span></span>
           <input id="clientName" placeholder="Optional" autocomplete="off" />
         </label>
@@ -219,7 +229,7 @@
    <div class="foot-in">
     <p class="tagline">The best results, <span>through action.</span></p>
     <p>A visual simulation for consultations, not a guaranteed outcome. Doses are general reference ranges; the treatment plan is decided by a qualified practitioner.</p>
-    <p class="ver">ORA · Tirana · version 202611191250</p>
+    <p class="ver">ORA · Tirana · version 202611191258</p>
    </div>
   </footer>
 
@@ -256,6 +266,27 @@
         <input id="clinicInput" placeholder="Your clinic" />
       </label>
 
+      <section class="prices" aria-labelledby="pricesTitle">
+        <div class="prices-head">
+          <h3 id="pricesTitle">Products &amp; prices</h3>
+          <button type="button" id="resetPrices" class="ghost">Reset to defaults</button>
+        </div>
+        <p class="hint">Prices in euros. The dot marks the product used by default.</p>
+
+        <h4>Fillers <span class="muted">price per syringe</span></h4>
+        <div id="prodFiller" class="prod-list"></div>
+        <button type="button" id="addFiller" class="ghost add">+ Add filler product</button>
+        <label class="switch small">
+          <input id="roundSyr" type="checkbox" checked />
+          <span class="track" aria-hidden="true"></span>
+          <span class="switch-text">Charge whole syringes<small>e.g. 1.5 mL is charged as 2 syringes</small></span>
+        </label>
+
+        <h4>Botox <span class="muted">price per unit · × = units per Botox unit</span></h4>
+        <div id="prodBotox" class="prod-list"></div>
+        <button type="button" id="addBotox" class="ghost add">+ Add botox product</button>
+      </section>
+
       <div class="row end">
         <button value="cancel" class="btn btn-line">Close</button>
         <button id="saveSettings" value="save" class="btn btn-solid">Save</button>
@@ -277,11 +308,12 @@
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
-  <script src="config.js?v=202611191250"></script>
-  <script src="data.js?v=202611191250"></script>
-  <script src="face.js?v=202611191250"></script>
-  <script src="live.js?v=202611191250"></script>
-  <script src="warp.js?v=202611191250"></script>
-  <script src="app.js?v=202611191250"></script>
+  <script src="config.js?v=202611191258"></script>
+  <script src="data.js?v=202611191258"></script>
+  <script src="face.js?v=202611191258"></script>
+  <script src="live.js?v=202611191258"></script>
+  <script src="warp.js?v=202611191258"></script>
+  <script src="app.js?v=202611191258"></script>
+  <script src="pricing.js?v=202611191258"></script>
 </body>
 </html>
