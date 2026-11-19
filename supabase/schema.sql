@@ -16,16 +16,16 @@ alter table public.profiles enable row level security;
 
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles
-  for select using (auth.uid() = id);
+  for select to authenticated using ((select auth.uid()) = id);
 
 drop policy if exists "update own profile" on public.profiles;
 create policy "update own profile" on public.profiles
-  for update using (auth.uid() = id) with check (auth.uid() = id);
+  for update to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 -- When someone creates an account, make their profile row from the sign-up form
 -- (name and clinic are sent as user metadata by the app).
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id, full_name, clinic_name, email)
   values (new.id,
@@ -35,6 +35,8 @@ begin
   on conflict (id) do nothing;
   return new;
 end $$;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
